@@ -559,7 +559,7 @@
       }
     ];
 
-    // 目前選中的巡查人員清單 (支援多人，如 [{ dept: '教務處', role: '教學組' }, { dept: '學務處', role: '生輔組' }])
+    // 目前選中的巡查人員清單 (支援多人)
     let selectedInspectors = [
       { dept: '教務處', role: '教學組' }
     ];
@@ -625,16 +625,15 @@
     ];
 
     // Google Apps Script Webhook URL setting
-    // 【重要提示】：請將下方引號內的網址直接換成您的 Google Apps Script 部署網址
-    // 這樣放進協作平台後，無論何時重新整理都不會丟失網址！
-    let googleSheetWebhookUrl = '';
+    // 【重要提示】：請將下方單引號裡面的網址換成您的 Google Apps Script 部署網址！
+    let googleSheetWebhookUrl = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
 
     // 管理員後台安全 PIN 碼（預設 8888）
     let adminPinCode = '8888';
 
     // Inspection state structure keyed by: buildingId_floor_classId
     let inspectionData = {};
-    let currentBuildingId = 'A';
+    let currentBuildingId = '忠孝';
     let currentFloor = '1F';
 
     // 電子簽名相關狀態
@@ -646,7 +645,6 @@
 
     /* Generate standard classes based on schoolConfig */
     function initializeData() {
-      // Retain existing remarks and tags if class matches
       const oldData = inspectionData;
       inspectionData = {};
 
@@ -675,7 +673,6 @@
         });
       });
 
-      // Update header hint
       const bHint = document.getElementById('header-building-count-hint');
       if (bHint) {
         bHint.innerText = `共 ${schoolConfig.length} 棟校舍 · ${Object.keys(inspectionData).length} 個班級/專科教室`;
@@ -690,14 +687,12 @@
 
       const currentSelectedDept = selectedInspectors.length > 0 ? selectedInspectors[0].dept : departmentRolesConfig[0]?.department;
 
-      // 1. 處室選單
       deptSelect.innerHTML = departmentRolesConfig.map(d => `
         <option value="${escapeHtml(d.department)}" ${d.department === currentSelectedDept ? 'selected' : ''}>
           ${escapeHtml(d.department)}
         </option>
       `).join('');
 
-      // 2. 對應組別清單
       updateRolesDropdown(currentSelectedDept);
       renderSelectedInspectorsPills();
     }
@@ -723,7 +718,6 @@
       const roleSelect = document.getElementById('role-select');
       const chosenRole = roleSelect ? roleSelect.value : '';
 
-      // 若目前只有一筆人員，直接切換；若有多筆則替換第一筆或新增
       if (selectedInspectors.length <= 1) {
         selectedInspectors = [{ dept: deptName, role: chosenRole }];
       } else {
@@ -736,7 +730,6 @@
       const deptSelect = document.getElementById('department-select');
       const deptName = deptSelect ? deptSelect.value : (departmentRolesConfig[0]?.department || '教務處');
 
-      // 更新首位人員
       if (selectedInspectors.length === 0) {
         selectedInspectors.push({ dept: deptName, role: roleName });
       } else {
@@ -745,7 +738,7 @@
       renderSelectedInspectorsPills();
     }
 
-    /* 渲染已選取人員標籤（多名同仁同時巡查） */
+    /* 渲染已選取人員標籤 */
     function renderSelectedInspectorsPills() {
       const container = document.getElementById('selected-inspectors-pills');
       if (!container) return;
@@ -845,14 +838,12 @@
       renderMultiRolePicker();
     }
 
-    /* 組合所有已選巡查同仁之完整顯示字串 (例如："教務處-教學組、學務處-生輔組") */
     function getInspectorsFormattedString() {
       if (selectedInspectors.length === 0) return '巡堂同仁';
       return selectedInspectors.map(i => `${i.dept}-${i.role}`).join('、');
     }
 
     function renderNavigation() {
-      // 1. Render Building Tabs
       const bContainer = document.getElementById('building-tabs');
       bContainer.innerHTML = schoolConfig.map(b => {
         const isActive = b.id === currentBuildingId;
@@ -874,7 +865,6 @@
         `;
       }).join('');
 
-      // 2. Render Floor Pills for current building
       const currentBObj = schoolConfig.find(b => b.id === currentBuildingId) || schoolConfig[0];
       if (currentBObj && currentBObj.id !== currentBuildingId) {
         currentBuildingId = currentBObj.id;
@@ -900,13 +890,11 @@
         `;
       }).join('');
 
-      // Update location label
       if (currentBObj) {
         document.getElementById('current-location-label').innerText = `${currentBObj.name} · ${currentFloor}`;
       }
     }
 
-    /* Reset Floor to Default Good Status */
     function resetCurrentFloor() {
       const items = Object.values(inspectionData).filter(item => item.buildingId === currentBuildingId && item.floor === currentFloor);
       items.forEach(item => {
@@ -948,7 +936,6 @@
       if (nextIndex >= 0 && nextIndex < floorNames.length) {
         setFloor(floorNames[nextIndex]);
       } else if (nextIndex >= floorNames.length) {
-        // Switch to next building
         const currentBIndex = schoolConfig.findIndex(b => b.id === currentBuildingId);
         if (currentBIndex + 1 < schoolConfig.length) {
           const nextB = schoolConfig[currentBIndex + 1];
@@ -962,7 +949,6 @@
           showToast("已到達最後一棟之最頂層！");
         }
       } else if (nextIndex < 0) {
-        // Previous building
         const currentBIndex = schoolConfig.findIndex(b => b.id === currentBuildingId);
         if (currentBIndex - 1 >= 0) {
           const prevB = schoolConfig[currentBIndex - 1];
@@ -986,7 +972,6 @@
       const currentItems = Object.entries(inspectionData)
         .filter(([key, item]) => item.buildingId === currentBuildingId && item.floor === currentFloor);
 
-      // Update floor counters
       const totalCount = currentItems.length;
       const reviewedCount = currentItems.filter(([key, item]) => item.reviewed || item.selectedTags.length > 0 || item.remark.trim().length > 0).length;
       
@@ -1022,7 +1007,6 @@
               ? 'border-rose-300 ring-2 ring-rose-100' 
               : (isRecorded ? 'border-emerald-300' : 'border-slate-200')
           }">
-            <!-- Top info & Recorded Indicator (已移除正常良好按鈕) -->
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
                 <span class="w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center ${
@@ -1036,7 +1020,6 @@
                 </div>
               </div>
 
-              <!-- 巡查標記狀態簡約提示 -->
               <div>
                 ${hasWarning ? `
                   <span class="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
@@ -1054,7 +1037,6 @@
               </div>
             </div>
 
-            <!-- Quick Exception & Observation Tags -->
             <div>
               <div class="flex items-center justify-between mb-1.5">
                 <span class="text-[11px] font-semibold text-slate-500">快速情境標籤：</span>
@@ -1088,7 +1070,6 @@
               </div>
             </div>
 
-            <!-- Remark Input & Voice Input -->
             <div class="space-y-1.5 pt-1 border-t border-slate-100">
               <div class="relative flex items-center">
                 <input type="text" 
@@ -1105,7 +1086,6 @@
                 </button>
               </div>
 
-              <!-- Quick Remark Chips -->
               <div class="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
                 <span class="text-[10px] text-slate-400 shrink-0">常見:</span>
                 ${QUICK_REMARKS.map(snippet => `
@@ -1121,14 +1101,6 @@
       }).join('');
 
       updateGlobalCounters();
-    }
-
-    function toggleCardStatus(key) {
-      if (!inspectionData[key]) return;
-      inspectionData[key].isNormal = !inspectionData[key].isNormal;
-      inspectionData[key].reviewed = true;
-      renderClassCards();
-      renderNavigation();
     }
 
     function toggleCardTag(key, tagId) {
@@ -1234,7 +1206,6 @@
       }
     }
 
-    /* 管理員身分 PIN 碼驗證邏輯 */
     function promptAdminPassword() {
       const authModal = document.getElementById('admin-auth-modal');
       const pinInput = document.getElementById('admin-pin-input');
@@ -1243,7 +1214,6 @@
         authModal.classList.remove('hidden');
         setTimeout(() => pinInput.focus(), 100);
 
-        // 支援鍵盤 Enter 送出
         pinInput.onkeydown = (e) => {
           if (e.key === 'Enter') verifyAdminPassword();
         };
@@ -1301,7 +1271,6 @@
       const btnDepts = document.getElementById('tab-btn-depts');
       const btnGsheet = document.getElementById('tab-btn-gsheet');
 
-      // Hide all
       tabClasses.classList.add('hidden');
       tabDepts.classList.add('hidden');
       tabGsheet.classList.add('hidden');
@@ -1345,7 +1314,6 @@
             ` : ''}
           </div>
 
-          <!-- Floors in this building -->
           <div class="space-y-2">
             <div class="text-[11px] font-bold text-slate-500 flex items-center justify-between">
               <span>樓層與班級名稱設定：</span>
@@ -1359,7 +1327,7 @@
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-1">
                     <span class="text-slate-500 font-semibold">樓層:</span>
-                    <input type="text" value="${escapeHtml(fl.name)}" onchange="updateFloorName(${bIdx}, ${fIdx}, this.value)" 
+                    <input type="text" value="${escapeHtml(fl.name)}" onchange="updateFloorName(${bIdx},${fIdx}, this.value)" 
                       class="w-12 bg-slate-50 border border-slate-300 rounded px-1 py-0.5 font-bold text-center text-xs">
                   </div>
                   ${b.floors.length > 1 ? `
@@ -1371,7 +1339,7 @@
                 <div>
                   <label class="text-[10px] text-slate-400 block mb-0.5">班級清單（以逗號或頓號分開）：</label>
                   <input type="text" value="${escapeHtml(fl.classes.join(', '))}" 
-                    onchange="updateFloorClasses(${bIdx}, ${fIdx}, this.value)"
+                    onchange="updateFloorClasses(${bIdx},${fIdx}, this.value)"
                     placeholder="例如：701, 702, 703, 專科教室" 
                     class="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800">
                 </div>
@@ -1394,7 +1362,6 @@
 
     function updateFloorClasses(bIdx, fIdx, rawStr) {
       if (!schoolConfig[bIdx] || !schoolConfig[bIdx].floors[fIdx]) return;
-      // split by comma or ideographic comma
       const arr = rawStr.split(/[,，、]/).map(s => s.trim()).filter(s => s.length > 0);
       schoolConfig[bIdx].floors[fIdx].classes = arr.length > 0 ? arr : ['第1班'];
     }
@@ -1416,7 +1383,7 @@
     }
 
     function addNewBuilding() {
-      const code = String.fromCharCode(65 + schoolConfig.length); // D, E, F...
+      const code = String.fromCharCode(65 + schoolConfig.length);
       schoolConfig.push({
         id: code,
         name: `${code}棟 (新大樓)`,
@@ -1434,7 +1401,6 @@
       renderBuildingsEditor();
     }
 
-    /* ==================== 處室與組別名單後台管理 ==================== */
     function renderDeptRolesEditor() {
       const container = document.getElementById('dept-roles-editor-container');
       if (!container) return;
@@ -1495,31 +1461,34 @@
     function restoreDefaultConfig() {
       schoolConfig = [
         {
-          id: 'A',
-          name: 'A棟 (教學大樓)',
+          id: '忠孝',
+          name: '忠孝樓',
           floors: [
-            { name: '1F', classes: ['701', '702', '703', '704'] },
-            { name: '2F', classes: ['705', '706', '707', '708'] },
-            { name: '3F', classes: ['801', '802', '803', '804'] },
-            { name: '4F', classes: ['805', '806', '807'] }
+            { name: '1F', classes: ['901', '902'] },
+            { name: '2F', classes: ['903', '904', '905', '906'] },
+            { name: '3F', classes: ['907', '908', '909'] },
+            { name: '4F', classes: ['801', '802', '803', '804'] },
+            { name: '5F', classes: ['805', '806', '807'] }
           ]
         },
         {
-          id: 'B',
-          name: 'B棟 (專科大樓)',
+          id: '仁愛',
+          name: '仁愛樓',
           floors: [
-            { name: '1F', classes: ['電腦教室一', '電腦教室二', '生活科技教室', '創客工坊'] },
-            { name: '2F', classes: ['生物實驗室', '理化實驗室A', '理化實驗室B', '器材室'] },
-            { name: '3F', classes: ['音樂教室一', '音樂教室二', '視覺藝術教室', '表演藝術教室'] }
+            { name: '1F', classes: ['CS101', 'CS102', 'CS201'] },
+            { name: '2F', classes: ['CS202', 'FD101', 'FD102', 'MA101'] },
+            { name: '3F', classes: ['MA201', 'MA202', 'MA102'] },
+            { name: '4F', classes: ['FD201', 'FD202', 'FD301', 'FD302'] },
+            { name: '5F', classes: ['CS301', 'CS302', 'MA301', 'MA302'] }
           ]
         },
         {
-          id: 'C',
-          name: 'C棟 (綜合大樓)',
+          id: '和平',
+          name: '和平樓',
           floors: [
-            { name: '1F', classes: ['901', '902', '903', '904'] },
-            { name: '2F', classes: ['905', '906', '907', '908'] },
-            { name: '3F', classes: ['圖書館', '多功能會議室', '輔導諮商室', '童軍教室'] }
+            { name: '2F', classes: ['701', '702'] },
+            { name: '3F', classes: ['703', '704'] },
+            { name: '4F', classes: ['705', '706', '707'] }
           ]
         }
       ];
@@ -1555,17 +1524,15 @@
 
       renderBuildingsEditor();
       renderDeptRolesEditor();
-      showToast("已恢復為範例預設校舍與處室組別");
+      showToast("已恢復為預設校舍與處室組別");
     }
 
     function saveAndApplySettings() {
-      // Save GAS Webhook URL
       const gasInput = document.getElementById('setting-gas-url');
       if (gasInput) {
         googleSheetWebhookUrl = gasInput.value.trim();
       }
 
-      // 檢查目前選中人員是否仍在處室清單中，若無則重設為第一個處室與組別
       const validSelected = selectedInspectors.filter(item => {
         const foundDept = departmentRolesConfig.find(d => d.department === item.dept);
         return foundDept && foundDept.roles.includes(item.role);
@@ -1577,10 +1544,9 @@
         selectedInspectors = [{ dept: departmentRolesConfig[0].department, role: departmentRolesConfig[0].roles[0] }];
       }
 
-      // Re-verify current building and floor
       const firstB = schoolConfig[0];
       if (!schoolConfig.some(b => b.id === currentBuildingId)) {
-        currentBuildingId = firstB ? firstB.id : 'A';
+        currentBuildingId = firstB ? firstB.id : '忠孝';
       }
       const bObj = schoolConfig.find(b => b.id === currentBuildingId);
       if (bObj && !bObj.floors.some(f => f.name === currentFloor)) {
@@ -1614,9 +1580,9 @@
     }
 
     async function testGoogleSheetConnection() {
-      const url = document.getElementById('setting-gas-url').value.trim();
-      if (!url) {
-        showToast("請先輸入 Apps Script 網頁應用程式網址");
+      const url = document.getElementById('setting-gas-url').value.trim() || googleSheetWebhookUrl;
+      if (!url || url === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') {
+        showToast("請先填寫正確的 Apps Script 網頁應用程式網址");
         return;
       }
 
@@ -1634,18 +1600,17 @@
           showToast("已收到回傳但格式異常，請確認部署權限");
         }
       } catch (err) {
-        // Due to CORS redirect in Google Apps Script, text/plain POST still succeeds on Google side
         showToast("已發送請求！請確認試算表內部署權限為「所有人」");
       }
     }
 
     async function syncToGoogleSheets() {
       const url = googleSheetWebhookUrl || (document.getElementById('setting-gas-url') ? document.getElementById('setting-gas-url').value.trim() : '');
-      if (!url) {
+      if (!url || url === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') {
         toggleSummaryModal(false);
         toggleSettingsModal(true);
         switchSettingsTab('gsheet');
-        showToast("尚未填寫 Google 試算表網址，請先完成設定");
+        showToast("尚未設定 Google 試算表網址，請先完成設定");
         return;
       }
 
@@ -1660,12 +1625,10 @@
       const inspector = getInspectorsFormattedString();
       const period = document.getElementById('period-select').value;
 
-      // 篩選與分類全校資料
       const allItems = Object.values(inspectionData);
       const totalClasses = allItems.length;
       const checkedClasses = allItems.filter(i => i.reviewed || i.selectedTags.length > 0 || (i.remark && i.remark.trim().length > 0)).length;
 
-      // 1. 抓取需留意/異常的班級清單（警告標籤或特別備註）
       const issueItems = allItems.filter(item => {
         const hasWarnTag = item.selectedTags.some(tid => {
           const t = STATUS_TAGS.find(x => x.id === tid);
@@ -1674,7 +1637,6 @@
         return hasWarnTag || (item.remark && item.remark.trim().length > 0);
       });
 
-      // 2. 抓取特殊教學或一般正常觀察標籤（分組教學、外師、協同等）
       const pedagogyItems = allItems.filter(item => {
         return item.selectedTags.some(tid => {
           const t = STATUS_TAGS.find(x => x.id === tid);
@@ -1682,7 +1644,6 @@
         });
       });
 
-      // 濃縮「需留意/異常班級摘要」字串
       let issueSummaryText = "全校教學與秩序正常，無特別異常";
       if (issueItems.length > 0) {
         issueSummaryText = issueItems.map(it => {
@@ -1697,7 +1658,6 @@
         }).join('；\n');
       }
 
-      // 濃縮「教學亮點/特殊活動班級」字串
       let pedagogySummaryText = "常態教學";
       if (pedagogyItems.length > 0) {
         pedagogySummaryText = pedagogyItems.map(it => {
@@ -1710,26 +1670,23 @@
         }).join('；\n');
       }
 
-      // 整體概況描述
       const overallStatus = issueItems.length > 0 ? `有 ${issueItems.length} 項需留意` : "良好正常";
       const progressText = `${checkedClasses}/${totalClasses} 班 (${Math.round((checkedClasses / (totalClasses || 1)) * 100)}%)`;
       const signStatus = signatureDataUrl ? "已完成手寫電子簽署" : "未簽名";
 
-      // 組合出「單一一整橫列」資料
       const singleInspectionRow = [
-        dateStr,                 // 1. 巡查日期 (例如 2026/09/09)
-        timeStr,                 // 2. 巡查時間 (例如 23:27)
-        period,                  // 3. 節次 (例如 第 3 節)
-        inspector,               // 4. 巡堂同仁 (例如 教務處-教學組)
-        overallStatus,           // 5. 整體概況
-        issueSummaryText,        // 6. 需留意/異常班級摘要 (已全部濃縮)
-        pedagogySummaryText,     // 7. 特殊教學活動班級摘要
-        progressText,            // 8. 查核進度
-        signStatus               // 9. 電子簽核狀態
+        dateStr,
+        timeStr,
+        period,
+        inspector,
+        overallStatus,
+        issueSummaryText,
+        pedagogySummaryText,
+        progressText,
+        signStatus
       ];
 
       try {
-        // 同時提供 row 與 rows，確保任何版本的 Apps Script 都能正確接手寫入
         await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1740,7 +1697,7 @@
           })
         });
 
-        showToast("✅ 已成功濃縮為單一橫列並寫入 Google 試算表！");
+        showToast("✅ 已成功寫入 Google 試算表！");
       } catch (e) {
         showToast("同步訊號已送出（若試算表未更新請檢查權限設定）");
       } finally {
@@ -1887,7 +1844,7 @@
       const period = document.getElementById('period-select').value;
       const date = new Date().toLocaleDateString('zh-TW');
 
-      let csvContent = "\uFEFF"; // UTF-8 BOM
+      let csvContent = "\uFEFF";
       csvContent += "巡查日期,節次,巡堂同仁,棟別,樓層,班級編號,班級名稱,狀態,情境標籤,備註細節\n";
 
       Object.values(inspectionData).forEach(item => {
@@ -1919,17 +1876,14 @@
     }
 
     function submitInspection() {
-      // 標記全校所有項目已完成查核
       const all = Object.values(inspectionData);
       all.forEach(i => i.reviewed = true);
       renderNavigation();
       renderClassCards();
 
-      // 開啟確認送出與電子簽署視窗
       toggleConfirmModal(true);
     }
 
-    /* 確認送出與電子簽名視窗開關及內容更新 */
     function toggleConfirmModal(show) {
       const modal = document.getElementById('confirm-submit-modal');
       if (!modal) return;
@@ -1937,7 +1891,6 @@
       if (show) {
         modal.classList.remove('hidden');
 
-        // 更新確認資訊卡片
         const period = document.getElementById('period-select') ? document.getElementById('period-select').value : '第 3 節';
         const inspector = getInspectorsFormattedString();
         const today = new Date().toLocaleDateString('zh-TW');
@@ -1953,40 +1906,34 @@
         document.getElementById('confirm-inspector-text').innerText = inspector;
         document.getElementById('confirm-stats-text').innerText = `已記錄 ${recordedCount} 班 · ${warningCount} 項需留意`;
 
-        // 初始化簽名板畫布尺寸與觸控事件
         setTimeout(initSignaturePad, 60);
       } else {
         modal.classList.add('hidden');
       }
     }
 
-    /* 初始化電子簽名畫布與事件監聽 */
     function initSignaturePad() {
       signatureCanvas = document.getElementById('signature-canvas');
       if (!signatureCanvas) return;
 
       signatureCtx = signatureCanvas.getContext('2d');
 
-      // 依據容器真實寬高設置 canvas 解析度，防止筆觸模糊
       const rect = signatureCanvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
       signatureCanvas.width = rect.width * dpr;
       signatureCanvas.height = rect.height * dpr;
       signatureCtx.scale(dpr, dpr);
 
-      // 設定簽名筆刷樣式
-      signatureCtx.strokeStyle = '#0f172a'; // slate-900 深色筆跡
+      signatureCtx.strokeStyle = '#0f172a';
       signatureCtx.lineWidth = 2.5;
       signatureCtx.lineCap = 'round';
       signatureCtx.lineJoin = 'round';
 
-      // 移除舊事件避免重複綁定
       signatureCanvas.onpointerdown = handleSignaturePointerDown;
       signatureCanvas.onpointermove = handleSignaturePointerMove;
       signatureCanvas.onpointerup = handleSignaturePointerUp;
       signatureCanvas.onpointercancel = handleSignaturePointerUp;
 
-      // 如果先前已簽過名且尚未清除，還原簽名圖像
       if (signatureDataUrl) {
         const img = new Image();
         img.onload = () => {
@@ -2030,7 +1977,6 @@
       if (!isDrawingSignature) return;
       isDrawingSignature = false;
       signatureCtx.closePath();
-      // 儲存為圖片字串
       signatureDataUrl = signatureCanvas.toDataURL('image/png');
     }
 
@@ -2044,14 +1990,12 @@
       if (hint) hint.classList.remove('hidden');
     }
 
-    /* 確認送出並儲存 */
     function confirmFinalSubmit() {
       if (!hasDrawnSignature && !signatureDataUrl) {
         showToast("請於下方簽名板完成手寫簽名後再送出", "fa-pen");
         return;
       }
 
-      // 關閉確認視窗並開啟成果總結清單
       toggleConfirmModal(false);
       toggleSummaryModal(true);
       showToast("✅ 巡堂紀錄與電子簽署已完成確認！", "fa-circle-check");
@@ -2079,7 +2023,6 @@
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
-    /* Update current time header */
     function updateHeaderTime() {
       const now = new Date();
       const dateStr = now.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', weekday: 'short' });
