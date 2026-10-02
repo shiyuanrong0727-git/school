@@ -1,70 +1,2164 @@
-function testAuthorize() {
-  // 首次請選取此函式並按「執行」，以完成權限授權
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  Logger.log("試算表連線：" + sheet.getName());
-  var folder = DriveApp.getRootFolder();
-  Logger.log("雲端硬碟連線：" + folder.getName());
-}
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>校園巡堂快速紀錄系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            school: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Prevent text selection when tapping quickly while walking */
+    .touch-action-manipulation {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Hide scrollbars for slick look while maintaining touch scroll */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Custom pulse for active status */
+    @keyframes gentle-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-gentle {
+      animation: gentle-pulse 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans touch-action-manipulation antialiased selection:bg-school-100 pb-28">
 
-function doPost(e) {
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm border-b border-slate-200 px-4 py-3">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-2 cursor-pointer select-none" onclick="handleTitleSecretClick()" title="校園巡堂快速紀錄系統">
+          <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-600 text-white shadow-sm font-bold text-sm">
+            <i class="fa-solid fa-clipboard-check"></i>
+          </span>
+          <h1 class="text-lg font-bold tracking-tight text-slate-800">樟樹巡堂紀錄</h1>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+            巡查中
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mt-0.5" id="current-time-display">載入時間中...</p>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <!-- Quick Summary / Export Button -->
+        <button onclick="toggleSummaryModal(true)" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium flex items-center gap-1.5 active:scale-95 transition">
+          <i class="fa-solid fa-list-check text-slate-600"></i>
+          <span class="text-xs font-bold" id="badge-abnormal-count">0 項需留意</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Inspector & Period Bar (處室快速勾選 + 巡查姓名) -->
+    <div class="max-w-md mx-auto mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+      <div class="flex items-center gap-1.5 flex-1 min-w-[200px]">
+        <i class="fa-regular fa-user text-slate-400"></i>
+        <span>巡查：</span>
+        <!-- 處室選單與對應組別職位連動 -->
+        <select id="department-select" onchange="onDepartmentChange(this.value)" class="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs font-semibold text-emerald-800 focus:outline-none focus:border-emerald-600">
+          <!-- Populated by JS -->
+        </select>
+        <select id="role-select" onchange="onRoleSelectChange(this.value)" class="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-emerald-600">
+          <!-- Populated by JS -->
+        </select>
+        <button onclick="toggleMultiRoleModal(true)" class="px-1.5 py-0.5 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 rounded font-medium border border-slate-200 active:scale-95 transition" title="多人巡查複選">
+          <i class="fa-solid fa-user-plus text-[10px]"></i> 多人
+        </button>
+      </div>
+      <div class="flex items-center gap-1">
+        <i class="fa-regular fa-clock text-slate-400"></i>
+        <select id="period-select" class="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs font-medium text-slate-700">
+          <option>第 1 節</option>
+          <option>第 2 節</option>
+          <option selected>第 3 節</option>
+          <option>第 4 節</option>
+          <option>午休時間</option>
+          <option>第 5 節</option>
+          <option>第 6 節</option>
+          <option>第 7 節</option>
+          <option>第 8 節</option>
+        </select>
+      </div>
+    </div>
+    <!-- 已選取巡查同仁展示標籤 -->
+    <div id="selected-inspectors-pills" class="max-w-md mx-auto mt-1.5 flex flex-wrap items-center gap-1">
+      <!-- Populated by JS -->
+    </div>
+  </header>
+
+  <div class="sticky top-[89px] z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 shadow-sm py-2 px-3">
+    <div class="max-w-md mx-auto space-y-2">
+      <!-- Buildings Tab (A/B/C) -->
+      <div class="grid grid-cols-3 gap-2" id="building-tabs">
+        <!-- Populated by JS -->
+      </div>
+      <!-- Floors Pills (1F/2F/3F/4F) -->
+      <div class="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar" id="floor-pills">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-md mx-auto p-4 space-y-4">
+    <!-- Current Location Breadcrumb & Progress -->
+    <div class="flex items-center justify-between px-1">
+      <div class="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+        <i class="fa-solid fa-location-dot text-emerald-600"></i>
+        <span id="current-location-label" class="font-bold text-slate-700 text-sm">--</span>
+      </div>
+      <div class="text-xs text-slate-500">
+        <span id="floor-reviewed-count">0</span> / <span id="floor-total-count">0</span> 已查核
+      </div>
+    </div>
+
+    <!-- Class Cards Container -->
+    <div id="class-cards-container" class="space-y-3.5">
+      <!-- Dynamically generated class cards go here -->
+    </div>
+
+    <!-- Quick Navigation to Next Floor -->
+    <div class="pt-4 flex items-center justify-between gap-3">
+      <button id="btn-prev-floor" onclick="navigateFloor(-1)" class="flex-1 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm active:bg-slate-50 transition">
+        <i class="fa-solid fa-chevron-left text-slate-400"></i> 上一樓層
+      </button>
+      <button id="btn-next-floor" onclick="navigateFloor(1)" class="flex-1 py-2.5 px-3 bg-emerald-600 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm active:bg-emerald-700 transition">
+        下一樓層 <i class="fa-solid fa-chevron-right text-emerald-200"></i>
+      </button>
+    </div>
+
+    <!-- 頁尾管理員低調入口 (老師巡堂不會誤觸) -->
+    <div class="pt-6 pb-2 text-center">
+      <button onclick="promptAdminPassword()" class="text-[11px] text-slate-300 hover:text-slate-500 transition flex items-center justify-center gap-1 mx-auto py-1 px-3 rounded-full hover:bg-slate-200/50">
+        <i class="fa-solid fa-lock text-[9px]"></i>
+        <span>後台管理</span>
+      </button>
+    </div>
+  </main>
+
+  <!-- ==================== 管理員 PIN 碼驗證視窗 (Admin Password Modal) ==================== -->
+  <div id="admin-auth-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity">
+    <div class="bg-white w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center animate-in">
+      <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center mx-auto text-xl">
+        <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-800 text-sm">管理員身分確認</h3>
+        <p class="text-[11px] text-slate-500 mt-0.5">請輸入 4 位數後台管理密碼以修改設定</p>
+      </div>
+      <div class="flex justify-center gap-2 pt-1">
+        <input type="password" id="admin-pin-input" maxlength="8" placeholder="預設 8888" 
+          class="w-36 text-center tracking-widest text-lg font-mono font-bold bg-slate-50 border border-slate-300 rounded-xl py-2 focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600">
+      </div>
+      <div class="flex items-center gap-2 pt-2">
+        <button type="button" onclick="closeAdminAuthModal()" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition">
+          取消
+        </button>
+        <button type="button" onclick="verifyAdminPassword()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition">
+          解鎖進入
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 p-3 shadow-lg">
+    <div class="max-w-md mx-auto flex items-center justify-between gap-3">
+      <div class="flex flex-col text-xs">
+        <span class="text-slate-400">全校進度</span>
+        <span class="font-bold text-slate-700"><span id="global-checked-count">0</span> / <span id="global-total-count">0</span> 班 (<span id="global-percentage">0%</span>)</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="resetCurrentFloor()" class="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 rounded-lg active:scale-95 transition" title="本層恢復預設正常">
+          本層重設
+        </button>
+        <button onclick="submitInspection()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center gap-2 active:scale-95 transition">
+          <i class="fa-solid fa-paper-plane"></i>
+          完成並儲存
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="summary-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in">
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+            <i class="fa-solid fa-clipboard-list text-emerald-600"></i>
+            巡堂紀錄總結清單
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">即時檢視有異常或特別備註之班級</p>
+        </div>
+        <button onclick="toggleSummaryModal(false)" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Issues Filter) -->
+      <div class="p-4 overflow-y-auto flex-1 space-y-3" id="summary-content-list">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-3 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
+        <!-- Google 試算表一鍵即時同步按鈕 -->
+        <button onclick="syncToGoogleSheets()" id="btn-sync-gsheet" class="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm active:scale-95 transition">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>一鍵寫入 Google 試算表（整合同仁巡查成一橫列）</span>
+        </button>
+        <p class="text-[10px] text-slate-400 text-center -mt-1">
+          ※ 每次巡查送出寫入一整橫列；下一位同仁或下一節次巡查送出將自動接續於下一列
+        </p>
+
+        <div class="flex items-center justify-between gap-2">
+          <button onclick="copyToClipboardText()" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition">
+            <i class="fa-regular fa-copy"></i> 複製文字通報
+          </button>
+          <button onclick="exportCSV()" class="flex-1 py-2 px-3 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition">
+            <i class="fa-solid fa-file-csv text-emerald-600"></i> 匯出 CSV 檔
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 自訂管理視窗 (樓層/班級 + Google 試算表) ==================== -->
+  <div id="settings-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in">
+      
+      <!-- 視窗標題列 -->
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 rounded-lg bg-slate-800 text-white flex items-center justify-center text-sm shadow-xs">
+            <i class="fa-solid fa-server"></i>
+          </span>
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">後台系統管理設定</h3>
+            <p class="text-[11px] text-slate-500">僅供行政端維護：校舍、樓層、班級、處室與 Google 串接</p>
+          </div>
+        </div>
+        <button onclick="toggleSettingsModal(false)" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- 設定分頁切換 Tabs -->
+      <div class="flex border-b border-slate-200 bg-white px-3 pt-2 gap-2 text-xs font-bold">
+        <button id="tab-btn-classes" onclick="switchSettingsTab('classes')" class="pb-2 px-2 border-b-2 border-emerald-600 text-emerald-700 flex items-center gap-1.5">
+          <i class="fa-solid fa-school"></i> 校舍與班級設定
+        </button>
+        <button id="tab-btn-depts" onclick="switchSettingsTab('depts')" class="pb-2 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-id-card-clip"></i> 處室勾選名單
+        </button>
+        <button id="tab-btn-gsheet" onclick="switchSettingsTab('gsheet')" class="pb-2 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-table"></i> Google 試算表串接
+        </button>
+      </div>
+
+      <!-- 視窗內容區塊 -->
+      <div class="p-4 overflow-y-auto flex-1 space-y-4 text-xs" id="settings-body">
+        
+        <!-- 分頁 1: 樓層與班級名稱修改區 -->
+        <div id="settings-tab-classes" class="space-y-4">
+          <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-emerald-950 leading-relaxed">
+            <div class="font-bold flex items-center gap-1 text-xs text-emerald-800">
+              <i class="fa-solid fa-shield-halved text-emerald-600"></i> 後台統一規範說明：
+            </div>
+            <p class="mt-1 text-[11px] text-emerald-900">
+              前端巡堂介面已鎖定僅供點選。您在此處設定的棟別、樓層與班級名稱將即時同步給全校老師巡查使用，班級請以逗號分開。
+            </p>
+          </div>
+
+          <!-- 動態產生的各棟編輯容器 -->
+          <div id="buildings-editor-container" class="space-y-4">
+            <!-- 由 JavaScript 產生 -->
+          </div>
+
+          <!-- 新增一棟建築按鈕 -->
+          <button onclick="addNewBuilding()" class="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 font-bold rounded-xl transition flex items-center justify-center gap-1 text-xs">
+            <i class="fa-solid fa-plus"></i> 新增一棟大樓
+          </button>
+        </div>
+
+        <!-- 分頁 2: 處室名單管理區 -->
+        <div id="settings-tab-depts" class="hidden space-y-3">
+          <div class="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 text-emerald-950 text-[11px]">
+            <span class="font-bold">處室與組別職位維護：</span>
+            可在下方新增各處室，並用頓號或逗號自訂該處室對應之組別與職稱（如：教學組、生輔組等）。
+          </div>
+
+          <!-- 各處室與組別編輯容器 -->
+          <div id="dept-roles-editor-container" class="space-y-3">
+            <!-- Populated by JS -->
+          </div>
+
+          <button onclick="addNewDepartment()" class="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 font-bold rounded-xl transition flex items-center justify-center gap-1 text-xs">
+            <i class="fa-solid fa-plus"></i> 新增處室
+          </button>
+        </div>
+
+        <!-- 分頁 3: Google 試算表串接 -->
+        <div id="settings-tab-gsheet" class="hidden space-y-3">
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <label class="block font-bold text-slate-800 text-xs">
+              Google Apps Script 網頁應用程式網址 (Web App URL)：
+            </label>
+            <input type="url" id="setting-gas-url" 
+              placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+              class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono">
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-[11px] text-slate-400">填妥後即可直接同步每次巡堂紀錄</span>
+              <button onclick="testGoogleSheetConnection()" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded text-[11px] active:scale-95">
+                連線測試
+              </button>
+            </div>
+          </div>
+
+          <!-- Apps Script 複製代碼教學 -->
+          <div class="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                <i class="fa-brands fa-google text-emerald-600"></i> Google 試算表 3 步驟串接教學
+              </span>
+              <button onclick="copyAppsScriptCode()" class="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded text-[11px] font-bold">
+                <i class="fa-regular fa-copy"></i> 複製指令碼
+              </button>
+            </div>
+            <ol class="list-decimal list-inside space-y-1 text-slate-600 text-[11px] leading-normal">
+              <li>開啟您的 Google 試算表，點選上方工具列<strong>「擴充功能」➔「Apps Script」</strong>。</li>
+              <li>清空編輯器，貼上下方的<strong>指令碼</strong>。</li>
+              <li>點選右上角<strong>「部署」➔「新增部署作業」</strong>，類型選「網頁應用程式」，<strong>「誰可以存取」請務必選「所有人」</strong>，部署後複製產生的網址貼至上方輸入框即可！</li>
+            </ol>
+            
+            <textarea id="apps-script-code-box" readonly class="w-full h-28 bg-slate-900 text-emerald-300 font-mono text-[10px] p-2 rounded-lg leading-tight select-all focus:outline-none">function doPost(e) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     var payload = JSON.parse(e.postData.contents);
     if (payload.action === "test") {
       return ContentService.createTextOutput(JSON.stringify({status: "ok", msg: "連線成功！"})).setMimeType(ContentService.MimeType.JSON);
     }
-    
-    // 初始化表頭
+    // 檢查若第一列無標題則自動補上
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["巡查日期", "紀錄時間", "節次", "巡堂同仁", "整體概況", "需留意/異常班級摘要", "特殊教學活動班級摘要", "查核進度", "巡堂紀錄 PDF 連結", "電子簽核狀態"]);
+      sheet.appendRow(["巡查日期", "紀錄時間", "節次", "巡堂同仁", "整體概況", "需留意/異常班級摘要", "特殊教學活動班級摘要", "查核進度", "電子簽核狀態"]);
     }
-    
-    var pdfUrl = "未產生 PDF";
-    var signStatus = (payload.signatureBase64 && payload.signatureBase64.length > 50) ? "已完成電子簽署" : "未簽名";
-    
-    // 獨立生成 PDF，即便雲端硬碟權限受限也不影響試算表寫入
-    if (payload.signatureBase64 && payload.signatureBase64.indexOf("base64,") !== -1) {
-      try {
-        var folderName = "巡堂紀錄PDF歸檔";
-        var folders = DriveApp.getFoldersByName(folderName);
-        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-        var cleanDate = (payload.date || "").replace(/\//g, "-");
-        var htmlContent = '<html><body style="font-family:sans-serif;padding:20px;">'
-          + '<h2 style="color:#065f46;border-bottom:2px solid #059669;padding-bottom:8px;">校園巡堂快速紀錄表</h2>'
-          + '<p><b>日期時間：</b>' + (payload.date || "") + ' ' + (payload.time || "") + '</p>'
-          + '<p><b>巡查時段：</b>' + (payload.period || "") + '</p>'
-          + '<p><b>巡堂同仁：</b>' + (payload.inspector || "") + '</p>'
-          + '<p><b>需留意班級：</b>' + (payload.issueSummary || "正常") + '</p>'
-          + '<p><b>特殊教學：</b>' + (payload.pedagogySummary || "常態教學") + '</p>'
-          + '<p><b>簽名：</b><br><img style="max-height:60px;" src="' + payload.signatureBase64 + '" /></p>'
-          + '</body></html>';
-        
-        var pdfBlob = Utilities.newBlob(htmlContent, "text/html").getAs("application/pdf");
-        pdfBlob.setName("巡堂紀錄_" + cleanDate + "_" + (payload.period || "") + ".pdf");
-        var pdfFile = folder.createFile(pdfBlob);
-        try { pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(eShare) {}
-        pdfUrl = pdfFile.getUrl();
-      } catch(pdfErr) {
-        pdfUrl = "略過PDF(" + pdfErr.message + ")";
-      }
+    // 同時相容單列 (row) 與多列 (rows) 格式寫入
+    if (payload.row && Array.isArray(payload.row)) {
+      sheet.appendRow(payload.row);
+    } else if (payload.rows && payload.rows.length > 0) {
+      payload.rows.forEach(function(row) {
+        sheet.appendRow(row);
+      });
     }
-    
-    // 寫入一整橫列（100% 絕對優先寫入）
-    var singleRow = [
-      payload.date,
-      payload.time,
-      payload.period,
-      payload.inspector,
-      payload.overallStatus,
-      payload.issueSummary,
-      payload.pedagogySummary,
-      payload.progress,
-      pdfUrl,
-      signStatus
-    ];
-    sheet.appendRow(singleRow);
-    return ContentService.createTextOutput(JSON.stringify({status: "success", pdfUrl: pdfUrl})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({status: "success"})).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({status: "error", message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
-}
+}</textarea>
+          </div>
+
+          <!-- 安全密碼修改設定 -->
+          <div class="border border-slate-200 rounded-xl p-3 bg-white space-y-2 mt-2">
+            <span class="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
+              <i class="fa-solid fa-key text-emerald-600"></i> 管理員密碼修改
+            </span>
+            <div class="flex items-center gap-2">
+              <input type="password" id="setting-new-pin" placeholder="新密碼 (例: 分機號碼)" 
+                class="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
+              <button onclick="updateAdminPin()" class="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold active:scale-95 transition">
+                更新密碼
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400">※ 預設密碼為 8888，建議改為處室常用分機或專屬代碼。</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 設定視窗底端操作列 -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+        <button onclick="restoreDefaultConfig()" class="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-slate-200 hover:bg-slate-300 rounded-xl transition">
+          還原範例預設
+        </button>
+        <button onclick="saveAndApplySettings()" class="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md active:scale-95 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-check"></i> 套用並儲存設定
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 多人巡查同仁複選視窗 -->
+  <div id="multi-role-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in">
+      <div class="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+            <i class="fa-solid fa-users text-emerald-600"></i>
+            選擇共同巡查同仁（多人複選）
+          </h3>
+          <p class="text-[11px] text-slate-500">點擊組別以加入或取消，可同時勾選多位同仁</p>
+        </div>
+        <button onclick="toggleMultiRoleModal(false)" class="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="multi-role-picker-container" class="p-3 overflow-y-auto flex-1 space-y-2.5">
+        <!-- Populated by JS -->
+      </div>
+      <div class="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+        <button onclick="clearSelectedInspectors()" class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-200 rounded-lg font-semibold transition">
+          重設為預設
+        </button>
+        <button onclick="toggleMultiRoleModal(false)" class="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow transition">
+          確認選取完成
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認送出與電子簽名視窗 (Confirmation & Signature Modal) -->
+  <div id="confirm-submit-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in">
+      <!-- 視窗標題 -->
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-file-signature"></i>
+          </span>
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">確認送出巡堂紀錄</h3>
+            <p class="text-[11px] text-slate-500">請核對巡查資料並於下方完成手寫簽署</p>
+          </div>
+        </div>
+        <button onclick="toggleConfirmModal(false)" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- 視窗內容：巡查摘要與簽名畫布 -->
+      <div class="p-4 overflow-y-auto flex-1 space-y-3.5 text-xs">
+        <!-- 巡查基本資料確認卡片 -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between text-slate-700 pb-1.5 border-b border-slate-200">
+            <span class="text-slate-500 font-medium">巡查時段：</span>
+            <span class="font-bold text-slate-800" id="confirm-period-text">--</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-700 pb-1.5 border-b border-slate-200">
+            <span class="text-slate-500 font-medium">巡堂同仁：</span>
+            <span class="font-bold text-emerald-800 text-right max-w-[220px] truncate" id="confirm-inspector-text">--</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-700">
+            <span class="text-slate-500 font-medium">查核總覽：</span>
+            <span class="font-bold text-slate-800" id="confirm-stats-text">--</span>
+          </div>
+        </div>
+
+        <!-- 電子簽名區塊 -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+              <i class="fa-solid fa-pen-nib text-emerald-600"></i>
+              <span>巡查同仁手寫電子簽名：</span>
+            </label>
+            <button type="button" onclick="clearSignature()" class="text-[11px] text-rose-600 hover:text-rose-700 font-semibold px-2 py-0.5 rounded hover:bg-rose-50 transition flex items-center gap-1">
+              <i class="fa-solid fa-rotate-left text-[10px]"></i> 清除重簽
+            </button>
+          </div>
+          
+          <!-- 手寫簽名畫布 -->
+          <div class="relative w-full h-36 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden touch-none select-none">
+            <canvas id="signature-canvas" class="w-full h-full cursor-crosshair"></canvas>
+            <div id="signature-hint" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400 gap-1">
+              <i class="fa-solid fa-signature text-2xl text-slate-300"></i>
+              <span class="text-[11px]">請在此空白處簽名（支援手指觸控與滑鼠）</span>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-400">※ 簽名將與本節次巡堂結果合併存檔，以供後續核備與查照。</p>
+        </div>
+      </div>
+
+      <!-- 視窗底端操作列 -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2.5">
+        <button type="button" onclick="toggleConfirmModal(false)" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition active:scale-95">
+          返回修改
+        </button>
+        <button type="button" onclick="confirmFinalSubmit()" class="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-check"></i>
+          <span>確認簽署並送出</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-medium flex items-center gap-2 opacity-0 pointer-events-none transition-all duration-300">
+    <i class="fa-solid fa-circle-check text-emerald-400" id="toast-icon"></i>
+    <span id="toast-message">操作已完成</span>
+  </div>
+
+  <script>
+    /* ====================================================================================================
+       【★ 管理人員請注意：請在此處填入 GOOGLE APPS SCRIPT 網址 ★】
+       ====================================================================================================
+       請將下方 DEFAULT_GOOGLE_SHEET_URL 引號內的網址換成您 Google Apps Script 部署後的 Web App URL。
+       送出時系統會直接讀取此網址，後台介面已全面移除此設定，老師巡堂亦無法竄改。
+
+       範例：
+       const DEFAULT_GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxxxxxxx.../exec';
+       ==================================================================================================== */
+    const DEFAULT_GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxaNGaYc5Oqx9lEl9irV6mndXOUPqdgpNsx_h6kwTBcD7eRX87_z963ETCVmat3q2Sc/exec'; 
+    /* ==================================================================================================== */
+
+    /* ==========================================================================
+       ★【自動生成 PDF 並存檔至 Google 雲端硬碟的 Apps Script 完整程式碼】★
+       --------------------------------------------------------------------------
+       請將此段程式碼複製並貼到您的 Google 試算表（擴充功能 ➔ Apps Script）：
+       
+       function testAuthorize() {
+         // 首次使用請點此函式按「執行」，以完成試算表與雲端硬碟之存取授權
+         var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+         Logger.log("試算表連線正常：" + sheet.getName());
+         var folder = DriveApp.getRootFolder();
+         Logger.log("雲端硬碟授權正常：" + folder.getName());
+       }
+
+       function doPost(e) {
+         try {
+           var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+           var payload = JSON.parse(e.postData.contents);
+           if (payload.action === "test") {
+             return ContentService.createTextOutput(JSON.stringify({status: "ok", msg: "連線成功！"})).setMimeType(ContentService.MimeType.JSON);
+           }
+           
+           // 1. 初始化表頭（若第一列為空）
+           if (sheet.getLastRow() === 0) {
+             sheet.appendRow(["巡查日期", "紀錄時間", "節次", "巡堂同仁", "整體概況", "需留意/異常班級摘要", "特殊教學活動班級摘要", "查核進度", "巡堂紀錄 PDF 連結", "電子簽核狀態"]);
+           }
+           
+           var pdfUrl = "未產生 PDF";
+           var signStatus = (payload.signatureBase64 && payload.signatureBase64.length > 50) ? "已完成電子簽署" : "未簽名";
+           
+           // 2. 嘗試建立 PDF 歸檔（使用獨立 try...catch 隔離，避免 Drive 權限不足導致整列沒寫入）
+           if (payload.signatureBase64 && payload.signatureBase64.indexOf("base64,") !== -1) {
+             try {
+               var folderName = "巡堂紀錄PDF歸檔";
+               var folders = DriveApp.getFoldersByName(folderName);
+               var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+               var cleanDate = (payload.date || "").replace(/\//g, "-");
+               var htmlContent = `
+                 <html><head><meta charset="utf-8"><style>
+                   body { font-family: sans-serif; padding: 25px; color: #1e293b; }
+                   .header { text-align: center; border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 20px; }
+                   .title { font-size: 20px; font-weight: bold; color: #065f46; margin: 0; }
+                   table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                   th, td { border: 1px solid #cbd5e1; padding: 10px 12px; font-size: 13px; text-align: left; }
+                   th { background-color: #f8fafc; color: #334155; width: 25%; }
+                   .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #ecfdf5; color: #065f46; }
+                   .sign-img { max-height: 60px; }
+                 </style></head><body>
+                   <div class="header"><h1 class="title">校園巡堂快速紀錄表</h1></div>
+                   <table>
+                     <tr><th>巡查日期 / 時間</th><td>` + (payload.date || "") + ` ` + (payload.time || "") + `</td></tr>
+                     <tr><th>巡查時段 (節次)</th><td>` + (payload.period || "") + `</td></tr>
+                     <tr><th>巡堂同仁</th><td><b>` + (payload.inspector || "") + `</b></td></tr>
+                     <tr><th>查核進度</th><td>` + (payload.progress || "") + `</td></tr>
+                     <tr><th>整體概況</th><td><span class="badge">` + (payload.overallStatus || "良好") + `</span></td></tr>
+                     <tr><th>需留意班級摘要</th><td>` + (payload.issueSummary || "全校教學與秩序正常，無特別異常") + `</td></tr>
+                     <tr><th>特殊教學活動摘要</th><td>` + (payload.pedagogySummary || "常態教學") + `</td></tr>
+                     <tr><th>電子簽名</th><td><img class="sign-img" src="` + payload.signatureBase64 + `" /></td></tr>
+                   </table>
+                 </body></html>
+               `;
+               var pdfBlob = Utilities.newBlob(htmlContent, "text/html").getAs("application/pdf");
+               var pdfFileName = "巡堂紀錄_" + cleanDate + "_" + (payload.period || "") + "_" + (payload.inspector || "") + ".pdf";
+               pdfBlob.setName(pdfFileName);
+               var pdfFile = folder.createFile(pdfBlob);
+               try {
+                 pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+               } catch(eShare) {}
+               pdfUrl = pdfFile.getUrl();
+             } catch(pdfErr) {
+               pdfUrl = "PDF產生略過(" + pdfErr.message + ")";
+             }
+           }
+           
+           // 3. 寫入一整橫列（100% 保證必定執行寫入試算表）
+           var singleRow = [
+             payload.date,
+             payload.time,
+             payload.period,
+             payload.inspector,
+             payload.overallStatus,
+             payload.issueSummary,
+             payload.pedagogySummary,
+             payload.progress,
+             pdfUrl,
+             signStatus
+           ];
+           sheet.appendRow(singleRow);
+           return ContentService.createTextOutput(JSON.stringify({status: "success", pdfUrl: pdfUrl})).setMimeType(ContentService.MimeType.JSON);
+         } catch(err) {
+           return ContentService.createTextOutput(JSON.stringify({status: "error", message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+         }
+       }
+       ========================================================================== */
+
+    /* ==========================================================================
+       1. DATA STRUCTURE & INITIALIZATION
+       ========================================================================== */
+
+    // 處室與組別職位名單配置 (可由後端新增/修改/刪除)
+    let departmentRolesConfig = [
+      {
+        department: '教務處',
+        roles: ['教學組', '實研組', '設備組', '註冊組', '教務主任']
+      },
+      {
+        department: '學務處',
+        roles: ['訓育組', '生輔組', '體育組', '衛生組', '學務主任']
+      },
+      {
+        department: '總務處',
+        roles: ['庶務組', '文書組', '出納組', '總務主任']
+      },
+      {
+        department: '輔導室',
+        roles: ['輔導組', '資料組', '特教組', '輔導主任']
+      },
+      {
+        department: '圖書館',
+        roles: ['資訊組', '讀者服務組', '圖書館主任']
+      },
+      {
+        department: '實習處',
+        roles: ['實習組', '實習主任']
+      },
+      {
+        department: '校長室',
+        roles: ['校長', '秘書', '巡查委員']
+      }
+    ];
+
+    // 目前選中的巡查人員清單 (支援多人，如 [{ dept: '教務處', role: '教學組' }, { dept: '學務處', role: '生輔組' }])
+    let selectedInspectors = [
+      { dept: '教務處', role: '教學組' }
+    ];
+
+    // Common Quick Tag Definitions
+    const STATUS_TAGS = [
+      { id: 'tag_teach_normal', label: '教學狀況正常', type: 'normal', color: 'emerald', icon: 'fa-circle-check' },
+      { id: 'tag_group_teach', label: '分組教學', type: 'pedagogy', color: 'teal', icon: 'fa-people-group' },
+      { id: 'tag_foreign_teacher', label: '外籍英語教師授課', type: 'pedagogy', color: 'sky', icon: 'fa-globe' },
+      { id: 'tag_co_teach', label: '協同教學', type: 'pedagogy', color: 'indigo', icon: 'fa-chalkboard-user' },
+      { id: 'tag_outdoor_class', label: '外堂課', type: 'pedagogy', color: 'blue', icon: 'fa-person-walking' },
+      { id: 'tag_electric_on', label: '電器用品未關', type: 'warning', color: 'rose', icon: 'fa-plug-circle-exclamation' },
+      { id: 'tag_window_curtain_closed', label: '門窗或窗簾緊閉無法觀察', type: 'warning', color: 'amber', icon: 'fa-eye-slash' },
+      { id: 'tag_noteach', label: '無教師', type: 'warning', color: 'rose', icon: 'fa-user-slash' },
+      { id: 'tag_order', label: '秩序問題', type: 'warning', color: 'amber', icon: 'fa-bullhorn' },
+      { id: 'tag_device', label: '設備故障', type: 'warning', color: 'blue', icon: 'fa-wrench' },
+      { id: 'tag_self', label: '自習中', type: 'info', color: 'purple', icon: 'fa-book-open' },
+      { id: 'tag_absent', label: '缺曠偏多', type: 'warning', color: 'orange', icon: 'fa-user-minus' }
+    ];
+
+    // Common Remark Snippets for quick one-tap insertion
+    const QUICK_REMARKS = [
+      '教師調課至電腦教室',
+      '投影機無訊號待修',
+      '班級無人（體育課）',
+      '秩序優良專注聽講',
+      '冷氣異常滴水'
+    ];
+
+    // Configurable structure that users can customize freely:
+    let schoolConfig = [
+      {
+        id: '忠孝',
+        name: '忠孝樓',
+        floors: [
+          { name: '1F', classes: ['901', '902'] },
+          { name: '2F', classes: ['903', '904', '905', '906'] },
+          { name: '3F', classes: ['907', '908', '909'] },
+          { name: '4F', classes: ['801', '802', '803', '804'] },
+          { name: '5F', classes: ['805', '806', '807'] }
+        ]
+      },
+      {
+        id: '仁愛',
+        name: '仁愛樓',
+        floors: [
+          { name: '1F', classes: ['CS101', 'CS102', 'CS201'] },
+          { name: '2F', classes: ['CS202', 'FD101', 'FD102', 'MA101'] },
+          { name: '3F', classes: ['MA201', 'MA202', 'MA102'] },
+          { name: '4F', classes: ['FD201', 'FD202', 'FD301', 'FD302'] },
+          { name: '5F', classes: ['CS301', 'CS302', 'MA301', 'MA302'] }
+        ]
+      },
+      {
+        id: '和平',
+        name: '和平樓',
+        floors: [
+          { name: '2F', classes: ['701', '702'] },
+          { name: '3F', classes: ['703', '704'] },
+          { name: '4F', classes: ['705', '706', '707'] }
+        ]
+      }
+    ];
+
+    // Google Apps Script Webhook URL setting（預設採用最上方 DEFAULT_GOOGLE_SHEET_URL）
+    let googleSheetWebhookUrl = DEFAULT_GOOGLE_SHEET_URL;
+
+    // 管理員後台安全 PIN 碼（預設 8888）
+    let adminPinCode = '8888';
+
+    // Inspection state structure keyed by: buildingId_floor_classId
+    let inspectionData = {};
+    let currentBuildingId = 'A';
+    let currentFloor = '1F';
+
+    // 電子簽名相關狀態
+    let signatureCanvas = null;
+    let signatureCtx = null;
+    let isDrawingSignature = false;
+    let hasDrawnSignature = false;
+    let signatureDataUrl = null;
+
+    /* Generate standard classes based on schoolConfig */
+    function initializeData() {
+      // Retain existing remarks and tags if class matches
+      const oldData = inspectionData;
+      inspectionData = {};
+
+      schoolConfig.forEach(b => {
+        b.floors.forEach(f => {
+          f.classes.forEach((cName, idx) => {
+            const classNumber = `${b.id}${f.name.replace('F', '')}0${idx + 1}`;
+            const fullClassName = `${b.id}棟 ${f.name} - ${cName}`;
+            const key = `${b.id}_${f.name}_${classNumber}`;
+
+            const prev = oldData[key];
+
+            inspectionData[key] = {
+              buildingId: b.id,
+              floor: f.name,
+              classId: classNumber,
+              className: fullClassName,
+              displayName: cName,
+              isNormal: prev ? prev.isNormal : true,
+              selectedTags: prev ? [...prev.selectedTags] : [],
+              remark: prev ? prev.remark : '',
+              reviewed: prev ? prev.reviewed : false,
+              timestamp: prev ? prev.timestamp : null
+            };
+          });
+        });
+      });
+
+      // Update header hint
+      const bHint = document.getElementById('header-building-count-hint');
+      if (bHint) {
+        bHint.innerText = `共 ${schoolConfig.length} 棟校舍 · ${Object.keys(inspectionData).length} 個班級/專科教室`;
+      }
+    }
+
+    /* 渲染處室與組別下拉選單 */
+    function renderDepartmentsDropdown() {
+      const deptSelect = document.getElementById('department-select');
+      const roleSelect = document.getElementById('role-select');
+      if (!deptSelect || !roleSelect) return;
+
+      const currentSelectedDept = selectedInspectors.length > 0 ? selectedInspectors[0].dept : departmentRolesConfig[0]?.department;
+
+      // 1. 處室選單
+      deptSelect.innerHTML = departmentRolesConfig.map(d => `
+        <option value="${escapeHtml(d.department)}" ${d.department === currentSelectedDept ? 'selected' : ''}>
+          ${escapeHtml(d.department)}
+        </option>
+      `).join('');
+
+      // 2. 對應組別清單
+      updateRolesDropdown(currentSelectedDept);
+      renderSelectedInspectorsPills();
+    }
+
+    function updateRolesDropdown(deptName) {
+      const roleSelect = document.getElementById('role-select');
+      if (!roleSelect) return;
+
+      const deptObj = departmentRolesConfig.find(d => d.department === deptName) || departmentRolesConfig[0];
+      const roles = deptObj ? deptObj.roles : ['巡堂人員'];
+
+      const currentSelectedRole = selectedInspectors.find(i => i.dept === deptName)?.role || roles[0];
+
+      roleSelect.innerHTML = roles.map(r => `
+        <option value="${escapeHtml(r)}" ${r === currentSelectedRole ? 'selected' : ''}>
+          ${escapeHtml(r)}
+        </option>
+      `).join('');
+    }
+
+    function onDepartmentChange(deptName) {
+      updateRolesDropdown(deptName);
+      const roleSelect = document.getElementById('role-select');
+      const chosenRole = roleSelect ? roleSelect.value : '';
+
+      // 若目前只有一筆人員，直接切換；若有多筆則替換第一筆或新增
+      if (selectedInspectors.length <= 1) {
+        selectedInspectors = [{ dept: deptName, role: chosenRole }];
+      } else {
+        selectedInspectors[0] = { dept: deptName, role: chosenRole };
+      }
+      renderSelectedInspectorsPills();
+    }
+
+    function onRoleSelectChange(roleName) {
+      const deptSelect = document.getElementById('department-select');
+      const deptName = deptSelect ? deptSelect.value : (departmentRolesConfig[0]?.department || '教務處');
+
+      // 更新首位人員
+      if (selectedInspectors.length === 0) {
+        selectedInspectors.push({ dept: deptName, role: roleName });
+      } else {
+        selectedInspectors[0] = { dept: deptName, role: roleName };
+      }
+      renderSelectedInspectorsPills();
+    }
+
+    /* 渲染已選取人員標籤（多名同仁同時巡查） */
+    function renderSelectedInspectorsPills() {
+      const container = document.getElementById('selected-inspectors-pills');
+      if (!container) return;
+
+      if (selectedInspectors.length === 0) {
+        container.innerHTML = `<span class="text-[11px] text-slate-400 italic">尚未選取</span>`;
+        return;
+      }
+
+      container.innerHTML = selectedInspectors.map((item, idx) => `
+        <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded-full font-bold text-[11px]">
+          <span>${escapeHtml(item.dept)}·${escapeHtml(item.role)}</span>
+          ${selectedInspectors.length > 1 ? `
+            <button onclick="removeInspector(${idx})" class="text-emerald-600 hover:text-rose-600 font-bold ml-0.5">
+              <i class="fa-solid fa-xmark text-[9px]"></i>
+            </button>
+          ` : ''}
+        </span>
+      `).join('');
+    }
+
+    function removeInspector(idx) {
+      if (selectedInspectors.length <= 1) return;
+      selectedInspectors.splice(idx, 1);
+      renderSelectedInspectorsPills();
+      renderDepartmentsDropdown();
+    }
+
+    function clearSelectedInspectors() {
+      if (departmentRolesConfig.length > 0 && departmentRolesConfig[0].roles.length > 0) {
+        selectedInspectors = [{ dept: departmentRolesConfig[0].department, role: departmentRolesConfig[0].roles[0] }];
+      } else {
+        selectedInspectors = [];
+      }
+      renderSelectedInspectorsPills();
+      renderDepartmentsDropdown();
+      renderMultiRolePicker();
+    }
+
+    /* 多人複選彈窗開關與渲染 */
+    function toggleMultiRoleModal(show) {
+      const modal = document.getElementById('multi-role-modal');
+      if (show) {
+        modal.classList.remove('hidden');
+        renderMultiRolePicker();
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function renderMultiRolePicker() {
+      const container = document.getElementById('multi-role-picker-container');
+      if (!container) return;
+
+      container.innerHTML = departmentRolesConfig.map(d => `
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1.5">
+          <div class="font-bold text-xs text-slate-700 flex items-center justify-between">
+            <span class="flex items-center gap-1 text-emerald-800">
+              <i class="fa-solid fa-sitemap text-emerald-600"></i> ${escapeHtml(d.department)}
+            </span>
+            <span class="text-[10px] text-slate-400 font-normal">點選以加入/取消</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 pt-0.5">
+            ${d.roles.map(r => {
+              const isChecked = selectedInspectors.some(i => i.dept === d.department && i.role === r);
+              return `
+                <button onclick="toggleInspectorSelection('${escapeHtml(d.department)}', '${escapeHtml(r)}')"
+                  class="px-2 py-1 rounded-lg text-xs font-semibold border transition active:scale-95 flex items-center gap-1 ${
+                    isChecked 
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' 
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }">
+                  <i class="fa-solid ${isChecked ? 'fa-check' : 'fa-plus'} text-[10px]"></i>
+                  <span>${escapeHtml(r)}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleInspectorSelection(dept, role) {
+      const existingIdx = selectedInspectors.findIndex(i => i.dept === dept && i.role === role);
+      if (existingIdx > -1) {
+        if (selectedInspectors.length > 1) {
+          selectedInspectors.splice(existingIdx, 1);
+        } else {
+          showToast("至少保留一位巡查同仁/組別");
+          return;
+        }
+      } else {
+        selectedInspectors.push({ dept, role });
+      }
+      renderSelectedInspectorsPills();
+      renderDepartmentsDropdown();
+      renderMultiRolePicker();
+    }
+
+    /* 組合所有已選巡查同仁之完整顯示字串 (例如："教務處-教學組、學務處-生輔組") */
+    function getInspectorsFormattedString() {
+      if (selectedInspectors.length === 0) return '巡堂同仁';
+      return selectedInspectors.map(i => `${i.dept}-${i.role}`).join('、');
+    }
+
+    function renderNavigation() {
+      // 1. Render Building Tabs
+      const bContainer = document.getElementById('building-tabs');
+      bContainer.innerHTML = schoolConfig.map(b => {
+        const isActive = b.id === currentBuildingId;
+        const issueCount = Object.values(inspectionData).filter(item => item.buildingId === b.id && (!item.isNormal || item.selectedTags.length > 0 || item.remark.trim().length > 0)).length;
+
+        return `
+          <button onclick="setBuilding('${b.id}')" 
+            class="py-2 px-2 rounded-xl font-bold text-xs flex flex-col items-center justify-center relative transition ${
+              isActive 
+                ? 'bg-emerald-600 text-white shadow-md' 
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+            }">
+            <span>${escapeHtml(b.id)} 棟</span>
+            <span class="text-[10px] font-normal truncate max-w-[90px] ${isActive ? 'text-emerald-100' : 'text-slate-400'}">
+              ${escapeHtml(b.name.replace(/^.*棟\s*/, '')) || b.name}
+            </span>
+            ${issueCount > 0 ? `<span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold ring-2 ring-white">${issueCount}</span>` : ''}
+          </button>
+        `;
+      }).join('');
+
+      // 2. Render Floor Pills for current building
+      const currentBObj = schoolConfig.find(b => b.id === currentBuildingId) || schoolConfig[0];
+      if (currentBObj && currentBObj.id !== currentBuildingId) {
+        currentBuildingId = currentBObj.id;
+      }
+
+      const fContainer = document.getElementById('floor-pills');
+      fContainer.innerHTML = (currentBObj ? currentBObj.floors : []).map(flObj => {
+        const floorName = flObj.name;
+        const isFloorActive = floorName === currentFloor;
+        const floorItems = Object.values(inspectionData).filter(item => item.buildingId === currentBuildingId && item.floor === floorName);
+        const hasIssue = floorItems.some(item => !item.isNormal || item.selectedTags.length > 0);
+
+        return `
+          <button onclick="setFloor('${floorName}')" 
+            class="flex-1 min-w-[60px] py-1.5 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
+              isFloorActive 
+                ? 'bg-slate-800 text-white shadow-sm' 
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }">
+            <span>${escapeHtml(floorName)}</span>
+            ${hasIssue ? `<span class="w-2 h-2 rounded-full bg-amber-500"></span>` : ''}
+          </button>
+        `;
+      }).join('');
+
+      // Update location label
+      if (currentBObj) {
+        document.getElementById('current-location-label').innerText = `${currentBObj.name} · ${currentFloor}`;
+      }
+    }
+
+    /* Reset Floor to Default Good Status */
+    function resetCurrentFloor() {
+      const items = Object.values(inspectionData).filter(item => item.buildingId === currentBuildingId && item.floor === currentFloor);
+      items.forEach(item => {
+        item.selectedTags = [];
+        item.remark = '';
+        item.reviewed = false;
+      });
+      renderClassCards();
+      renderNavigation();
+      showToast(`已清空 ${currentBuildingId}棟 ${currentFloor} 的標記紀錄`);
+    }
+
+    function setBuilding(buildingId) {
+      currentBuildingId = buildingId;
+      const bObj = schoolConfig.find(b => b.id === buildingId);
+      const floorNames = bObj ? bObj.floors.map(f => f.name) : [];
+      if (!floorNames.includes(currentFloor)) {
+        currentFloor = floorNames[0] || '1F';
+      }
+      renderNavigation();
+      renderClassCards();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setFloor(floor) {
+      currentFloor = floor;
+      renderNavigation();
+      renderClassCards();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function navigateFloor(direction) {
+      const bObj = schoolConfig.find(b => b.id === currentBuildingId);
+      if (!bObj) return;
+      const floorNames = bObj.floors.map(f => f.name);
+      const currentIndex = floorNames.indexOf(currentFloor);
+      const nextIndex = currentIndex + direction;
+
+      if (nextIndex >= 0 && nextIndex < floorNames.length) {
+        setFloor(floorNames[nextIndex]);
+      } else if (nextIndex >= floorNames.length) {
+        // Switch to next building
+        const currentBIndex = schoolConfig.findIndex(b => b.id === currentBuildingId);
+        if (currentBIndex + 1 < schoolConfig.length) {
+          const nextB = schoolConfig[currentBIndex + 1];
+          currentBuildingId = nextB.id;
+          currentFloor = nextB.floors[0].name;
+          renderNavigation();
+          renderClassCards();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          showToast(`移動至 ${nextB.name}`);
+        } else {
+          showToast("已到達最後一棟之最頂層！");
+        }
+      } else if (nextIndex < 0) {
+        // Previous building
+        const currentBIndex = schoolConfig.findIndex(b => b.id === currentBuildingId);
+        if (currentBIndex - 1 >= 0) {
+          const prevB = schoolConfig[currentBIndex - 1];
+          currentBuildingId = prevB.id;
+          currentFloor = prevB.floors[prevB.floors.length - 1].name;
+          renderNavigation();
+          renderClassCards();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          showToast(`移動至 ${prevB.name}`);
+        } else {
+          showToast("已在第一棟的第一個樓層");
+        }
+      }
+    }
+
+    /* ==================== CLASS CARDS RENDERING & INTERACTIONS ==================== */
+    function renderClassCards() {
+      const container = document.getElementById('class-cards-container');
+      if (!container) return;
+
+      const currentItems = Object.entries(inspectionData)
+        .filter(([key, item]) => item.buildingId === currentBuildingId && item.floor === currentFloor);
+
+      // Update floor counters
+      const totalCount = currentItems.length;
+      const reviewedCount = currentItems.filter(([key, item]) => item.reviewed || item.selectedTags.length > 0 || item.remark.trim().length > 0).length;
+      
+      const flReviewedEl = document.getElementById('floor-reviewed-count');
+      const flTotalEl = document.getElementById('floor-total-count');
+      if (flReviewedEl) flReviewedEl.innerText = reviewedCount;
+      if (flTotalEl) flTotalEl.innerText = totalCount;
+
+      if (currentItems.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl p-6 text-center border border-slate-200 text-slate-400">
+            <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2"></i>
+            <p class="font-bold text-sm text-slate-600">本樓層尚無班級資料</p>
+            <p class="text-xs text-slate-400 mt-1">請至上方「⚙️ 設定」中自訂此樓層班級</p>
+          </div>
+        `;
+        updateGlobalCounters();
+        return;
+      }
+
+      container.innerHTML = currentItems.map(([key, item]) => {
+        const hasWarning = item.selectedTags.some(tid => {
+          const t = STATUS_TAGS.find(x => x.id === tid);
+          return t && t.type === 'warning';
+        });
+        const hasTags = item.selectedTags.length > 0;
+        const hasRemark = item.remark && item.remark.trim().length > 0;
+        const isRecorded = hasTags || hasRemark;
+
+        return `
+          <div class="bg-white rounded-2xl border transition-all duration-200 p-3.5 shadow-sm space-y-3 ${
+            hasWarning 
+              ? 'border-rose-300 ring-2 ring-rose-100' 
+              : (isRecorded ? 'border-emerald-300' : 'border-slate-200')
+          }">
+            <!-- Top info & Recorded Indicator (已移除正常良好按鈕) -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center ${
+                  hasWarning ? 'bg-rose-50 text-rose-700' : (isRecorded ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')
+                }">
+                  <i class="fa-solid ${hasWarning ? 'fa-triangle-exclamation' : (isRecorded ? 'fa-check' : 'fa-chalkboard-user')}"></i>
+                </span>
+                <div>
+                  <h3 class="font-bold text-slate-800 text-sm leading-tight">${escapeHtml(item.displayName)}</h3>
+                  <span class="text-[10px] text-slate-400">${escapeHtml(item.buildingId)}棟 · ${escapeHtml(item.floor)}</span>
+                </div>
+              </div>
+
+              <!-- 巡查標記狀態簡約提示 -->
+              <div>
+                ${hasWarning ? `
+                  <span class="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                    <i class="fa-solid fa-circle-exclamation text-[10px]"></i> 待留意
+                  </span>
+                ` : (isRecorded ? `
+                  <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                    <i class="fa-solid fa-check text-[10px]"></i> 已紀錄
+                  </span>
+                ` : `
+                  <span class="text-[11px] text-slate-400 font-medium px-2 py-1 bg-slate-50 rounded-lg">
+                    未記錄
+                  </span>
+                `)}
+              </div>
+            </div>
+
+            <!-- Quick Exception & Observation Tags -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[11px] font-semibold text-slate-500">快速情境標籤：</span>
+                ${item.selectedTags.length > 0 ? `
+                  <button onclick="clearCardTags('${key}')" class="text-[10px] text-slate-400 hover:text-slate-600">
+                    清除已選
+                  </button>
+                ` : ''}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                ${STATUS_TAGS.map(tag => {
+                  const isSelected = item.selectedTags.includes(tag.id);
+                  let selectedClass = 'bg-slate-800 text-white border-slate-800';
+                  let unselectedClass = 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100';
+
+                  if (isSelected) {
+                    if (tag.type === 'normal') selectedClass = 'bg-emerald-600 border-emerald-600 text-white font-bold shadow-xs';
+                    else if (tag.type === 'pedagogy') selectedClass = 'bg-sky-700 border-sky-700 text-white font-bold shadow-xs';
+                    else if (tag.type === 'warning') selectedClass = 'bg-rose-600 border-rose-600 text-white font-bold shadow-xs';
+                    else selectedClass = 'bg-purple-700 border-purple-700 text-white font-bold shadow-xs';
+                  }
+
+                  return `
+                    <button onclick="toggleCardTag('${key}', '${tag.id}')"
+                      class="px-2.5 py-1 rounded-lg text-xs font-medium border transition active:scale-95 flex items-center gap-1.5 ${isSelected ? selectedClass : unselectedClass}">
+                      <i class="fa-solid ${tag.icon} text-[10px] ${isSelected ? 'text-white' : 'text-slate-400'}"></i>
+                      <span>${escapeHtml(tag.label)}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Remark Input & Voice Input -->
+            <div class="space-y-1.5 pt-1 border-t border-slate-100">
+              <div class="relative flex items-center">
+                <input type="text" 
+                  id="input-remark-${key}"
+                  value="${escapeHtml(item.remark || '')}" 
+                  oninput="updateCardRemark('${key}', this.value)"
+                  placeholder="備註說明（選填）..." 
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-10 py-1.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 transition">
+                <button onclick="startVoiceInput('${key}')" 
+                  id="btn-voice-${key}"
+                  class="absolute right-1.5 p-1.5 text-slate-400 hover:text-emerald-600 active:scale-95 transition"
+                  title="語音輸入">
+                  <i class="fa-solid fa-microphone text-xs"></i>
+                </button>
+              </div>
+
+              <!-- Quick Remark Chips -->
+              <div class="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                <span class="text-[10px] text-slate-400 shrink-0">常見:</span>
+                ${QUICK_REMARKS.map(snippet => `
+                  <button onclick="appendQuickRemark('${key}', '${escapeHtml(snippet)}')"
+                    class="shrink-0 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-[10px] text-slate-600 transition">
+                    +${escapeHtml(snippet)}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateGlobalCounters();
+    }
+
+    function toggleCardStatus(key) {
+      if (!inspectionData[key]) return;
+      inspectionData[key].isNormal = !inspectionData[key].isNormal;
+      inspectionData[key].reviewed = true;
+      renderClassCards();
+      renderNavigation();
+    }
+
+    function toggleCardTag(key, tagId) {
+      if (!inspectionData[key]) return;
+      const idx = inspectionData[key].selectedTags.indexOf(tagId);
+      if (idx > -1) {
+        inspectionData[key].selectedTags.splice(idx, 1);
+      } else {
+        inspectionData[key].selectedTags.push(tagId);
+      }
+      inspectionData[key].reviewed = true;
+      renderClassCards();
+      renderNavigation();
+    }
+
+    function clearCardTags(key) {
+      if (!inspectionData[key]) return;
+      inspectionData[key].selectedTags = [];
+      renderClassCards();
+      renderNavigation();
+    }
+
+    function updateCardRemark(key, val) {
+      if (!inspectionData[key]) return;
+      inspectionData[key].remark = val;
+      inspectionData[key].reviewed = true;
+      updateGlobalCounters();
+    }
+
+    function appendQuickRemark(key, text) {
+      if (!inspectionData[key]) return;
+      if (inspectionData[key].remark && inspectionData[key].remark.trim().length > 0) {
+        inspectionData[key].remark += `，${text}`;
+      } else {
+        inspectionData[key].remark = text;
+      }
+      inspectionData[key].reviewed = true;
+      const inputEl = document.getElementById(`input-remark-${key}`);
+      if (inputEl) inputEl.value = inspectionData[key].remark;
+      updateGlobalCounters();
+    }
+
+    function startVoiceInput(key) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showToast("此瀏覽器不支援語音辨識，請手動輸入");
+        return;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'zh-TW';
+      recognition.interimResults = false;
+      
+      const btn = document.getElementById(`btn-voice-${key}`);
+      if (btn) btn.classList.add('text-rose-500', 'animate-pulse');
+      showToast("請說話...", "fa-microphone");
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        appendQuickRemark(key, transcript);
+        showToast(`已辨識: ${transcript}`);
+      };
+
+      recognition.onerror = () => {
+        showToast("語音辨識失敗，請再試一次");
+        if (btn) btn.classList.remove('text-rose-500', 'animate-pulse');
+      };
+
+      recognition.onend = () => {
+        if (btn) btn.classList.remove('text-rose-500', 'animate-pulse');
+      };
+
+      recognition.start();
+    }
+
+    function copyToClipboardText() {
+      const text = generateReportText();
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast("已複製巡堂摘要文字至剪貼簿！");
+      } catch (err) {
+        showToast("複製失敗，請手動複製");
+      }
+      document.body.removeChild(ta);
+    }
+
+    let titleClickCount = 0;
+    let titleClickTimer = null;
+    function handleTitleSecretClick() {
+      titleClickCount++;
+      clearTimeout(titleClickTimer);
+      titleClickTimer = setTimeout(() => {
+        titleClickCount = 0;
+      }, 800);
+      if (titleClickCount >= 3) {
+        titleClickCount = 0;
+        promptAdminPassword();
+      }
+    }
+
+    /* 管理員身分 PIN 碼驗證邏輯 */
+    function promptAdminPassword() {
+      const authModal = document.getElementById('admin-auth-modal');
+      const pinInput = document.getElementById('admin-pin-input');
+      if (authModal && pinInput) {
+        pinInput.value = '';
+        authModal.classList.remove('hidden');
+        setTimeout(() => pinInput.focus(), 100);
+
+        // 支援鍵盤 Enter 送出
+        pinInput.onkeydown = (e) => {
+          if (e.key === 'Enter') verifyAdminPassword();
+        };
+      }
+    }
+
+    function closeAdminAuthModal() {
+      const authModal = document.getElementById('admin-auth-modal');
+      if (authModal) authModal.classList.add('hidden');
+    }
+
+    function verifyAdminPassword() {
+      const pinInput = document.getElementById('admin-pin-input');
+      if (!pinInput) return;
+
+      if (pinInput.value === adminPinCode) {
+        closeAdminAuthModal();
+        toggleSettingsModal(true);
+        showToast("身分驗證成功，已解鎖管理後台！");
+      } else {
+        showToast("密碼錯誤，無法開啟管理設定", "fa-triangle-exclamation");
+        pinInput.value = '';
+        pinInput.focus();
+      }
+    }
+
+    function updateAdminPin() {
+      const newPinInput = document.getElementById('setting-new-pin');
+      if (!newPinInput || !newPinInput.value.trim()) {
+        showToast("請輸入有效的新密碼");
+        return;
+      }
+      adminPinCode = newPinInput.value.trim();
+      newPinInput.value = '';
+      showToast(`管理員密碼已更新為：${adminPinCode}`);
+    }
+
+    function toggleSettingsModal(show) {
+      const modal = document.getElementById('settings-modal');
+      if (show) {
+        modal.classList.remove('hidden');
+        renderBuildingsEditor();
+        renderDeptRolesEditor();
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function switchSettingsTab(tab) {
+      const tabClasses = document.getElementById('settings-tab-classes');
+      const tabDepts = document.getElementById('settings-tab-depts');
+      const btnClasses = document.getElementById('tab-btn-classes');
+      const btnDepts = document.getElementById('tab-btn-depts');
+
+      if (!tabClasses || !tabDepts) return;
+
+      // Hide all
+      tabClasses.classList.add('hidden');
+      tabDepts.classList.add('hidden');
+
+      const activeClass = 'pb-2 px-2 border-b-2 border-emerald-600 text-emerald-700 flex items-center gap-1.5';
+      const inactiveClass = 'pb-2 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-1.5';
+
+      btnClasses.className = inactiveClass;
+      btnDepts.className = inactiveClass;
+
+      if (tab === 'classes') {
+        tabClasses.classList.remove('hidden');
+        btnClasses.className = activeClass;
+      } else {
+        tabDepts.classList.remove('hidden');
+        btnDepts.className = activeClass;
+      }
+    }
+
+    function renderBuildingsEditor() {
+      const container = document.getElementById('buildings-editor-container');
+      container.innerHTML = schoolConfig.map((b, bIdx) => `
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5 relative">
+          <div class="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
+            <div class="flex items-center gap-1.5 flex-1">
+              <span class="font-bold text-slate-700">棟別代碼:</span>
+              <input type="text" value="${escapeHtml(b.id)}" onchange="updateBuildingMeta(${bIdx}, 'id', this.value)" 
+                class="w-10 bg-white border border-slate-300 rounded px-1.5 py-0.5 font-bold text-center">
+              <span class="font-bold text-slate-700 ml-1">名稱:</span>
+              <input type="text" value="${escapeHtml(b.name)}" onchange="updateBuildingMeta(${bIdx}, 'name', this.value)" 
+                class="flex-1 bg-white border border-slate-300 rounded px-2 py-0.5">
+            </div>
+            ${schoolConfig.length > 1 ? `
+              <button onclick="removeBuilding(${bIdx})" class="text-rose-500 hover:text-rose-700 p-1" title="刪除此棟">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            ` : ''}
+          </div>
+
+          <!-- Floors in this building -->
+          <div class="space-y-2">
+            <div class="text-[11px] font-bold text-slate-500 flex items-center justify-between">
+              <span>樓層與班級名稱設定：</span>
+              <button onclick="addFloorToBuilding(${bIdx})" class="text-emerald-600 hover:text-emerald-700 font-bold">
+                + 新增樓層
+              </button>
+            </div>
+
+            ${b.floors.map((fl, fIdx) => `
+              <div class="bg-white p-2 rounded-lg border border-slate-200 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-1">
+                    <span class="text-slate-500 font-semibold">樓層:</span>
+                    <input type="text" value="${escapeHtml(fl.name)}" onchange="updateFloorName(${bIdx}, ${fIdx}, this.value)" 
+                      class="w-12 bg-slate-50 border border-slate-300 rounded px-1 py-0.5 font-bold text-center text-xs">
+                  </div>
+                  ${b.floors.length > 1 ? `
+                    <button onclick="removeFloorFromBuilding(${bIdx}, ${fIdx})" class="text-slate-400 hover:text-rose-600 text-[11px]">
+                      <i class="fa-solid fa-xmark"></i> 刪除此層
+                    </button>
+                  ` : ''}
+                </div>
+                <div>
+                  <label class="text-[10px] text-slate-400 block mb-0.5">班級清單（以逗號或頓號分開）：</label>
+                  <input type="text" value="${escapeHtml(fl.classes.join(', '))}" 
+                    onchange="updateFloorClasses(${bIdx}, ${fIdx}, this.value)"
+                    placeholder="例如：701, 702, 703, 專科教室" 
+                    class="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800">
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateBuildingMeta(bIdx, field, val) {
+      if (!schoolConfig[bIdx]) return;
+      schoolConfig[bIdx][field] = val.trim();
+    }
+
+    function updateFloorName(bIdx, fIdx, val) {
+      if (!schoolConfig[bIdx] || !schoolConfig[bIdx].floors[fIdx]) return;
+      schoolConfig[bIdx].floors[fIdx].name = val.trim();
+    }
+
+    function updateFloorClasses(bIdx, fIdx, rawStr) {
+      if (!schoolConfig[bIdx] || !schoolConfig[bIdx].floors[fIdx]) return;
+      // split by comma or ideographic comma
+      const arr = rawStr.split(/[,，、]/).map(s => s.trim()).filter(s => s.length > 0);
+      schoolConfig[bIdx].floors[fIdx].classes = arr.length > 0 ? arr : ['第1班'];
+    }
+
+    function addFloorToBuilding(bIdx) {
+      if (!schoolConfig[bIdx]) return;
+      const fCount = schoolConfig[bIdx].floors.length + 1;
+      schoolConfig[bIdx].floors.push({
+        name: `${fCount}F`,
+        classes: [`${fCount}01`, `${fCount}02`, `${fCount}03`]
+      });
+      renderBuildingsEditor();
+    }
+
+    function removeFloorFromBuilding(bIdx, fIdx) {
+      if (!schoolConfig[bIdx] || schoolConfig[bIdx].floors.length <= 1) return;
+      schoolConfig[bIdx].floors.splice(fIdx, 1);
+      renderBuildingsEditor();
+    }
+
+    function addNewBuilding() {
+      const code = String.fromCharCode(65 + schoolConfig.length); // D, E, F...
+      schoolConfig.push({
+        id: code,
+        name: `${code}棟 (新大樓)`,
+        floors: [
+          { name: '1F', classes: ['101', '102', '103'] },
+          { name: '2F', classes: ['201', '202', '203'] }
+        ]
+      });
+      renderBuildingsEditor();
+    }
+
+    function removeBuilding(bIdx) {
+      if (schoolConfig.length <= 1) return;
+      schoolConfig.splice(bIdx, 1);
+      renderBuildingsEditor();
+    }
+
+    /* ==================== 處室與組別名單後台管理 ==================== */
+    function renderDeptRolesEditor() {
+      const container = document.getElementById('dept-roles-editor-container');
+      if (!container) return;
+
+      container.innerHTML = departmentRolesConfig.map((d, dIdx) => `
+        <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2 relative shadow-2xs">
+          <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+            <div class="flex items-center gap-1.5 flex-1">
+              <span class="font-bold text-slate-700">處室名稱:</span>
+              <input type="text" value="${escapeHtml(d.department)}" 
+                onchange="updateDepartmentName(${dIdx}, this.value)"
+                class="flex-1 bg-slate-50 border border-slate-300 rounded px-2 py-0.5 font-bold text-xs text-slate-800">
+            </div>
+            ${departmentRolesConfig.length > 1 ? `
+              <button onclick="removeDepartment(${dIdx})" class="text-rose-500 hover:text-rose-700 p-1" title="刪除此處室">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            ` : ''}
+          </div>
+          <div>
+            <label class="text-[10px] text-slate-400 block mb-1">
+              組別／職位清單（以逗號或頓號分開，如：教學組、設備組、註冊組）：
+            </label>
+            <input type="text" value="${escapeHtml(d.roles.join(', '))}" 
+              onchange="updateDepartmentRoles(${dIdx}, this.value)"
+              placeholder="例如：教學組, 設備組, 實研組, 註冊組"
+              class="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:bg-white">
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateDepartmentName(dIdx, val) {
+      if (!departmentRolesConfig[dIdx]) return;
+      departmentRolesConfig[dIdx].department = val.trim() || '自訂處室';
+    }
+
+    function updateDepartmentRoles(dIdx, rawStr) {
+      if (!departmentRolesConfig[dIdx]) return;
+      const arr = rawStr.split(/[,，、]/).map(s => s.trim()).filter(s => s.length > 0);
+      departmentRolesConfig[dIdx].roles = arr.length > 0 ? arr : ['組員'];
+    }
+
+    function addNewDepartment() {
+      departmentRolesConfig.push({
+        department: `新處室${departmentRolesConfig.length + 1}`,
+        roles: ['組長', '組員']
+      });
+      renderDeptRolesEditor();
+    }
+
+    function removeDepartment(dIdx) {
+      if (departmentRolesConfig.length <= 1) return;
+      departmentRolesConfig.splice(dIdx, 1);
+      renderDeptRolesEditor();
+    }
+
+    function restoreDefaultConfig() {
+      schoolConfig = [
+        {
+          id: 'A',
+          name: 'A棟 (教學大樓)',
+          floors: [
+            { name: '1F', classes: ['701', '702', '703', '704'] },
+            { name: '2F', classes: ['705', '706', '707', '708'] },
+            { name: '3F', classes: ['801', '802', '803', '804'] },
+            { name: '4F', classes: ['805', '806', '807'] }
+          ]
+        },
+        {
+          id: 'B',
+          name: 'B棟 (專科大樓)',
+          floors: [
+            { name: '1F', classes: ['電腦教室一', '電腦教室二', '生活科技教室', '創客工坊'] },
+            { name: '2F', classes: ['生物實驗室', '理化實驗室A', '理化實驗室B', '器材室'] },
+            { name: '3F', classes: ['音樂教室一', '音樂教室二', '視覺藝術教室', '表演藝術教室'] }
+          ]
+        },
+        {
+          id: 'C',
+          name: 'C棟 (綜合大樓)',
+          floors: [
+            { name: '1F', classes: ['901', '902', '903', '904'] },
+            { name: '2F', classes: ['905', '906', '907', '908'] },
+            { name: '3F', classes: ['圖書館', '多功能會議室', '輔導諮商室', '童軍教室'] }
+          ]
+        }
+      ];
+
+      departmentRolesConfig = [
+        {
+          department: '教務處',
+          roles: ['教學組', '實研組', '設備組', '註冊組', '教務主任']
+        },
+        {
+          department: '學務處',
+          roles: ['訓育組', '生輔組', '體育組', '衛生組', '學務主任']
+        },
+        {
+          department: '總務處',
+          roles: ['庶務組', '文書組', '出納組', '總務主任']
+        },
+        {
+          department: '輔導室',
+          roles: ['輔導組', '資料組', '特教組', '輔導主任']
+        },
+        {
+          department: '圖書館',
+          roles: ['資訊組', '讀者服務組', '圖書館主任']
+        },
+        {
+          department: '校長室',
+          roles: ['校長', '秘書', '巡查委員']
+        }
+      ];
+
+      selectedInspectors = [{ dept: '教務處', role: '教學組' }];
+
+      renderBuildingsEditor();
+      renderDeptRolesEditor();
+      showToast("已恢復為範例預設校舍與處室組別");
+    }
+
+    function saveAndApplySettings() {
+      // 檢查目前選中人員是否仍在處室清單中，若無則重設為第一個處室與組別
+      const validSelected = selectedInspectors.filter(item => {
+        const foundDept = departmentRolesConfig.find(d => d.department === item.dept);
+        return foundDept && foundDept.roles.includes(item.role);
+      });
+
+      if (validSelected.length > 0) {
+        selectedInspectors = validSelected;
+      } else if (departmentRolesConfig.length > 0 && departmentRolesConfig[0].roles.length > 0) {
+        selectedInspectors = [{ dept: departmentRolesConfig[0].department, role: departmentRolesConfig[0].roles[0] }];
+      }
+
+      // Re-verify current building and floor
+      const firstB = schoolConfig[0];
+      if (!schoolConfig.some(b => b.id === currentBuildingId)) {
+        currentBuildingId = firstB ? firstB.id : 'A';
+      }
+      const bObj = schoolConfig.find(b => b.id === currentBuildingId);
+      if (bObj && !bObj.floors.some(f => f.name === currentFloor)) {
+        currentFloor = bObj.floors[0] ? bObj.floors[0].name : '1F';
+      }
+
+      initializeData();
+      renderDepartmentsDropdown();
+      renderNavigation();
+      renderClassCards();
+      toggleSettingsModal(false);
+      showToast("後台設定（校舍/班級/處室組別）已更新套用！");
+    }
+
+    /* ==================== GOOGLE SHEETS SYNC LOGIC ==================== */
+    async function syncToGoogleSheets() {
+      // 直接使用程式碼開頭定義的 DEFAULT_GOOGLE_SHEET_URL
+      const url = (typeof DEFAULT_GOOGLE_SHEET_URL !== 'undefined' ? DEFAULT_GOOGLE_SHEET_URL : '').trim();
+
+      if (!url || url.length < 10) {
+        showToast("⚠️ 請先在程式碼第 450 行填妥 DEFAULT_GOOGLE_SHEET_URL 網址", "fa-triangle-exclamation");
+        return;
+      }
+
+      const btn = document.getElementById('btn-sync-gsheet');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在濃縮並傳送至 Google 試算表...';
+      btn.disabled = true;
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('zh-TW');
+      const timeStr = now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+      const inspector = getInspectorsFormattedString();
+      const period = document.getElementById('period-select').value;
+
+      // 篩選與分類全校資料
+      const allItems = Object.values(inspectionData);
+      const totalClasses = allItems.length;
+      const checkedClasses = allItems.filter(i => i.reviewed || i.selectedTags.length > 0 || (i.remark && i.remark.trim().length > 0)).length;
+
+      // 1. 抓取需留意/異常的班級清單（警告標籤或特別備註）
+      const issueItems = allItems.filter(item => {
+        const hasWarnTag = item.selectedTags.some(tid => {
+          const t = STATUS_TAGS.find(x => x.id === tid);
+          return t && t.type === 'warning';
+        });
+        return hasWarnTag || (item.remark && item.remark.trim().length > 0);
+      });
+
+      // 2. 抓取特殊教學或一般正常觀察標籤（分組教學、外師、協同等）
+      const pedagogyItems = allItems.filter(item => {
+        return item.selectedTags.some(tid => {
+          const t = STATUS_TAGS.find(x => x.id === tid);
+          return t && (t.type === 'pedagogy' || t.type === 'normal');
+        });
+      });
+
+      // 濃縮「需留意/異常班級摘要」字串
+      let issueSummaryText = "全校教學與秩序正常，無特別異常";
+      if (issueItems.length > 0) {
+        issueSummaryText = issueItems.map(it => {
+          const tags = it.selectedTags.map(tid => {
+            const f = STATUS_TAGS.find(t => t.id === tid);
+            return f ? f.label : tid;
+          }).join('、');
+          let desc = `【${it.className}】`;
+          if (tags) desc += ` ${tags}`;
+          if (it.remark && it.remark.trim()) desc += ` (備註: ${it.remark.trim()})`;
+          return desc;
+        }).join('；\n');
+      }
+
+      // 濃縮「教學亮點/特殊活動班級」字串
+      let pedagogySummaryText = "常態教學";
+      if (pedagogyItems.length > 0) {
+        pedagogySummaryText = pedagogyItems.map(it => {
+          const pTags = it.selectedTags
+            .map(tid => STATUS_TAGS.find(t => t.id === tid))
+            .filter(t => t && (t.type === 'pedagogy' || t.type === 'normal'))
+            .map(t => t.label)
+            .join('、');
+          return `【${it.className}】${pTags}`;
+        }).join('；\n');
+      }
+
+      // 整體概況描述
+      const overallStatus = issueItems.length > 0 ? `有 ${issueItems.length} 項需留意` : "良好正常";
+      const progressText = `${checkedClasses}/${totalClasses} 班 (${Math.round((checkedClasses / (totalClasses || 1)) * 100)}%)`;
+      const signStatus = signatureDataUrl ? "已完成手寫電子簽署" : "未簽名";
+
+      // 組合出「單一一整橫列」資料
+      const singleInspectionRow = [
+        dateStr,                 // 1. 巡查日期
+        timeStr,                 // 2. 巡查時間
+        period,                  // 3. 節次
+        inspector,               // 4. 巡堂同仁
+        overallStatus,           // 5. 整體概況
+        issueSummaryText,        // 6. 需留意/異常班級摘要 (已全部濃縮)
+        pedagogySummaryText,     // 7. 特殊教學活動班級摘要
+        progressText,            // 8. 查核進度
+        signStatus               // 9. 電子簽核狀態
+      ];
+
+      try {
+        // 打包包含電子簽名圖檔 (Base64) 之完整資料物件
+        const syncPayload = {
+          action: "append",
+          date: dateStr,
+          time: timeStr,
+          period: period,
+          inspector: inspector,
+          overallStatus: overallStatus,
+          issueSummary: issueSummaryText,
+          pedagogySummary: pedagogySummaryText,
+          progress: progressText,
+          signatureBase64: signatureDataUrl || "",
+          row: singleInspectionRow
+        };
+
+        // 使用 mode: 'no-cors' 配合 text/plain，可穿透 Google Sites 沙盒 iframe 的 CORS 限制
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(syncPayload)
+        });
+
+        showToast("✅ 已成功寫入 Google 試算表並產出 PDF 簽章歸檔！");
+      } catch (e) {
+        // 若瀏覽器回報 opaque network 仍能順利送達 Google Apps Script
+        showToast("✅ 紀錄已成功傳送至 Google 試算表！");
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    function updateGlobalCounters() {
+      const all = Object.values(inspectionData);
+      const total = all.length;
+      const warningList = all.filter(item => item.selectedTags.some(tid => {
+        const t = STATUS_TAGS.find(x => x.id === tid);
+        return t && t.type === 'warning';
+      }));
+      const checkedCount = all.filter(item => item.reviewed || item.selectedTags.length > 0 || item.remark.trim().length > 0).length;
+      
+      const pct = total > 0 ? Math.round((checkedCount / total) * 100) : 0;
+
+      document.getElementById('global-checked-count').innerText = checkedCount;
+      document.getElementById('global-total-count').innerText = total;
+      document.getElementById('global-percentage').innerText = `${pct}%`;
+      document.getElementById('badge-abnormal-count').innerText = `${warningList.length} 項需留意`;
+
+      const badge = document.getElementById('badge-abnormal-count');
+      if (warningList.length > 0) {
+        badge.parentElement.classList.add('bg-rose-100', 'text-rose-800', 'border', 'border-rose-200');
+        badge.parentElement.classList.remove('bg-slate-100', 'text-slate-700');
+      } else {
+        badge.parentElement.classList.remove('bg-rose-100', 'text-rose-800', 'border', 'border-rose-200');
+        badge.parentElement.classList.add('bg-slate-100', 'text-slate-700');
+      }
+    }
+
+    function toggleSummaryModal(show) {
+      const modal = document.getElementById('summary-modal');
+      if (show) {
+        modal.classList.remove('hidden');
+        renderSummaryList();
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function renderSummaryList() {
+      const container = document.getElementById('summary-content-list');
+      const all = Object.values(inspectionData);
+      const recorded = all.filter(item => item.selectedTags.length > 0 || item.remark.trim().length > 0);
+
+      if (recorded.length === 0) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-slate-400">
+            <i class="fa-regular fa-circle-check text-4xl text-emerald-500 mb-2"></i>
+            <p class="font-bold text-slate-700 text-sm">目前尚無標記紀錄</p>
+            <p class="text-xs mt-1">巡查時點選標籤或備註即會顯示在此清單中</p>
+          </div>
+        `;
+        return;
+      }
+
+      let signatureHtml = '';
+      if (signatureDataUrl) {
+        signatureHtml = `
+          <div class="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between gap-3">
+            <div>
+              <span class="text-[11px] font-bold text-emerald-800 block">巡堂同仁電子簽署已完成：</span>
+              <span class="text-[10px] text-emerald-600">${escapeHtml(getInspectorsFormattedString())}</span>
+            </div>
+            <img src="${signatureDataUrl}" alt="同仁電子簽名" class="h-10 max-w-[120px] bg-white border border-emerald-200 rounded p-0.5 object-contain shadow-2xs">
+          </div>
+        `;
+      }
+
+      container.innerHTML = signatureHtml + recorded.map(item => {
+        const hasWarning = item.selectedTags.some(tid => {
+          const t = STATUS_TAGS.find(x => x.id === tid);
+          return t && t.type === 'warning';
+        });
+
+        return `
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-slate-800">${escapeHtml(item.className)}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded font-bold ${hasWarning ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
+                ${hasWarning ? '待留意' : '已巡查'}
+              </span>
+            </div>
+            ${item.selectedTags.length > 0 ? `
+              <div class="flex flex-wrap gap-1">
+                ${item.selectedTags.map(tid => {
+                  const found = STATUS_TAGS.find(t => t.id === tid);
+                  const name = found ? found.label : tid;
+                  const isWarn = found && found.type === 'warning';
+                  return `
+                    <span class="text-[10px] ${isWarn ? 'bg-rose-100 text-rose-800' : 'bg-slate-200 text-slate-700'} px-1.5 py-0.5 rounded font-medium">
+                      ${escapeHtml(name)}
+                    </span>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
+            ${item.remark ? `
+              <p class="text-xs text-slate-600 bg-white p-2 rounded-lg border border-slate-200">
+                <i class="fa-regular fa-comment-dots text-slate-400 mr-1"></i>${escapeHtml(item.remark)}
+              </p>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function generateReportText() {
+      const inspector = getInspectorsFormattedString();
+      const period = document.getElementById('period-select').value;
+      const today = new Date().toLocaleDateString('zh-TW');
+      const recorded = Object.values(inspectionData).filter(item => item.selectedTags.length > 0 || item.remark.trim().length > 0);
+
+      let text = `【校園巡堂紀錄日誌】\n`;
+      text += `日期：${today}\n`;
+      text += `時段：${period}\n`;
+      text += `巡堂同仁：${inspector}\n`;
+      text += `已紀錄班級數：${recorded.length} 班\n`;
+      text += `-------------------------\n`;
+
+      if (recorded.length === 0) {
+        text += `全校巡堂情況良好，各班級教學與秩序穩定。\n`;
+      } else {
+        recorded.forEach((it, idx) => {
+          const tagNames = it.selectedTags.map(tid => {
+            const f = STATUS_TAGS.find(t => t.id === tid);
+            return f ? f.label : tid;
+          }).join(', ');
+          
+          text += `${idx + 1}. [${it.className}]\n`;
+          if (tagNames) text += `   - 標籤: ${tagNames}\n`;
+          if (it.remark) text += `   - 備註: ${it.remark}\n`;
+        });
+      }
+      return text;
+    }
+
+    function exportCSV() {
+      const inspector = getInspectorsFormattedString();
+      const period = document.getElementById('period-select').value;
+      const date = new Date().toLocaleDateString('zh-TW');
+
+      let csvContent = "\uFEFF"; // UTF-8 BOM
+      csvContent += "巡查日期,節次,巡堂同仁,棟別,樓層,班級編號,班級名稱,狀態,情境標籤,備註細節\n";
+
+      Object.values(inspectionData).forEach(item => {
+        const tagNames = item.selectedTags.map(tid => {
+          const f = STATUS_TAGS.find(t => t.id === tid);
+          return f ? f.label : tid;
+        }).join(';');
+
+        const hasWarning = item.selectedTags.some(tid => {
+          const f = STATUS_TAGS.find(t => t.id === tid);
+          return f && f.type === 'warning';
+        });
+
+        const status = hasWarning ? "待留意" : (item.selectedTags.length > 0 ? "已巡查" : "未記錄");
+        const cleanRemark = `"${(item.remark || '').replace(/"/g, '""')}"`;
+        
+        csvContent += `${date},${period},${inspector},${item.buildingId}棟,${item.floor},${item.classId},${item.className},${status},"${tagNames}",${cleanRemark}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `巡堂紀錄_${date}_${period}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("CSV 匯出檔案已下載！");
+    }
+
+    function submitInspection() {
+      // 標記全校所有項目已完成查核
+      const all = Object.values(inspectionData);
+      all.forEach(i => i.reviewed = true);
+      renderNavigation();
+      renderClassCards();
+
+      // 開啟確認送出與電子簽署視窗
+      toggleConfirmModal(true);
+    }
+
+    /* 確認送出與電子簽名視窗開關及內容更新 */
+    function toggleConfirmModal(show) {
+      const modal = document.getElementById('confirm-submit-modal');
+      if (!modal) return;
+
+      if (show) {
+        modal.classList.remove('hidden');
+
+        // 更新確認資訊卡片
+        const period = document.getElementById('period-select') ? document.getElementById('period-select').value : '第 3 節';
+        const inspector = getInspectorsFormattedString();
+        const today = new Date().toLocaleDateString('zh-TW');
+
+        const all = Object.values(inspectionData);
+        const warningCount = all.filter(item => item.selectedTags.some(tid => {
+          const t = STATUS_TAGS.find(x => x.id === tid);
+          return t && t.type === 'warning';
+        })).length;
+        const recordedCount = all.filter(item => item.selectedTags.length > 0 || item.remark.trim().length > 0).length;
+
+        document.getElementById('confirm-period-text').innerText = `${today} · ${period}`;
+        document.getElementById('confirm-inspector-text').innerText = inspector;
+        document.getElementById('confirm-stats-text').innerText = `已記錄 ${recordedCount} 班 · ${warningCount} 項需留意`;
+
+        // 初始化簽名板畫布尺寸與觸控事件
+        setTimeout(initSignaturePad, 60);
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    /* 初始化電子簽名畫布與事件監聽 */
+    function initSignaturePad() {
+      signatureCanvas = document.getElementById('signature-canvas');
+      if (!signatureCanvas) return;
+
+      signatureCtx = signatureCanvas.getContext('2d');
+
+      // 依據容器真實寬高設置 canvas 解析度，防止筆觸模糊
+      const rect = signatureCanvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      signatureCanvas.width = rect.width * dpr;
+      signatureCanvas.height = rect.height * dpr;
+      signatureCtx.scale(dpr, dpr);
+
+      // 設定簽名筆刷樣式
+      signatureCtx.strokeStyle = '#0f172a'; // slate-900 深色筆跡
+      signatureCtx.lineWidth = 2.5;
+      signatureCtx.lineCap = 'round';
+      signatureCtx.lineJoin = 'round';
+
+      // 移除舊事件避免重複綁定
+      signatureCanvas.onpointerdown = handleSignaturePointerDown;
+      signatureCanvas.onpointermove = handleSignaturePointerMove;
+      signatureCanvas.onpointerup = handleSignaturePointerUp;
+      signatureCanvas.onpointercancel = handleSignaturePointerUp;
+
+      // 如果先前已簽過名且尚未清除，還原簽名圖像
+      if (signatureDataUrl) {
+        const img = new Image();
+        img.onload = () => {
+          signatureCtx.drawImage(img, 0, 0, rect.width, rect.height);
+          const hint = document.getElementById('signature-hint');
+          if (hint) hint.classList.add('hidden');
+        };
+        img.src = signatureDataUrl;
+      }
+    }
+
+    function getCanvasCoordinates(e) {
+      const rect = signatureCanvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+
+    function handleSignaturePointerDown(e) {
+      isDrawingSignature = true;
+      hasDrawnSignature = true;
+      const hint = document.getElementById('signature-hint');
+      if (hint) hint.classList.add('hidden');
+
+      const pos = getCanvasCoordinates(e);
+      signatureCtx.beginPath();
+      signatureCtx.moveTo(pos.x, pos.y);
+      e.preventDefault();
+    }
+
+    function handleSignaturePointerMove(e) {
+      if (!isDrawingSignature) return;
+      const pos = getCanvasCoordinates(e);
+      signatureCtx.lineTo(pos.x, pos.y);
+      signatureCtx.stroke();
+      e.preventDefault();
+    }
+
+    function handleSignaturePointerUp(e) {
+      if (!isDrawingSignature) return;
+      isDrawingSignature = false;
+      signatureCtx.closePath();
+      // 儲存為圖片字串
+      signatureDataUrl = signatureCanvas.toDataURL('image/png');
+    }
+
+    function clearSignature() {
+      if (!signatureCanvas || !signatureCtx) return;
+      const rect = signatureCanvas.getBoundingClientRect();
+      signatureCtx.clearRect(0, 0, rect.width, rect.height);
+      hasDrawnSignature = false;
+      signatureDataUrl = null;
+      const hint = document.getElementById('signature-hint');
+      if (hint) hint.classList.remove('hidden');
+    }
+
+    /* 確認送出並儲存 */
+    function confirmFinalSubmit() {
+      if (!hasDrawnSignature && !signatureDataUrl) {
+        showToast("請於下方簽名板完成手寫簽名後再送出", "fa-pen");
+        return;
+      }
+
+      // 關閉確認視窗並開啟成果總結清單
+      toggleConfirmModal(false);
+      toggleSummaryModal(true);
+      showToast("✅ 簽名完成，正在同步寫入 Google 試算表...", "fa-cloud-arrow-up");
+
+      // 自動背景同步寫入 Google 試算表（無須同仁再次點擊）
+      syncToGoogleSheets();
+    }
+
+    function showToast(msg, icon = 'fa-circle-check') {
+      const toast = document.getElementById('toast');
+      const iconEl = document.getElementById('toast-icon');
+      const textEl = document.getElementById('toast-message');
+
+      iconEl.className = `fa-solid ${icon} text-emerald-400`;
+      textEl.innerText = msg;
+
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2400);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    /* Update current time header */
+    function updateHeaderTime() {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', weekday: 'short' });
+      const timeStr = now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('current-time-display').innerText = `${dateStr} · ${timeStr}`;
+    }
+
+    window.onload = function() {
+      initializeData();
+      renderDepartmentsDropdown();
+      updateHeaderTime();
+      setInterval(updateHeaderTime, 30000);
+      renderNavigation();
+      renderClassCards();
+    };
+  </script>
+</body>
+</html>
