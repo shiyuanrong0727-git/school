@@ -80,12 +80,9 @@
       <div class="flex items-center gap-1.5 flex-1 min-w-[200px]">
         <i class="fa-regular fa-user text-slate-400"></i>
         <span>巡查：</span>
-        <!-- 處室選單與對應組別職位連動 -->
         <select id="department-select" onchange="onDepartmentChange(this.value)" class="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs font-semibold text-emerald-800 focus:outline-none focus:border-emerald-600">
-          <!-- Populated by JS -->
         </select>
         <select id="role-select" onchange="onRoleSelectChange(this.value)" class="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-emerald-600">
-          <!-- Populated by JS -->
         </select>
         <button onclick="toggleMultiRoleModal(true)" class="px-1.5 py-0.5 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 rounded font-medium border border-slate-200 active:scale-95 transition" title="多人巡查複選">
           <i class="fa-solid fa-user-plus text-[10px]"></i> 多人
@@ -106,27 +103,20 @@
         </select>
       </div>
     </div>
-    <!-- 已選取巡查同仁展示標籤 -->
     <div id="selected-inspectors-pills" class="max-w-md mx-auto mt-1.5 flex flex-wrap items-center gap-1">
-      <!-- Populated by JS -->
     </div>
   </header>
 
   <div class="sticky top-[89px] z-30 bg-slate-50/95 backdrop-blur border-b border-slate-200 shadow-sm py-2 px-3">
     <div class="max-w-md mx-auto space-y-2">
-      <!-- Buildings Tab (A/B/C) -->
       <div class="grid grid-cols-3 gap-2" id="building-tabs">
-        <!-- Populated by JS -->
       </div>
-      <!-- Floors Pills (1F/2F/3F/4F) -->
       <div class="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar" id="floor-pills">
-        <!-- Populated by JS -->
       </div>
     </div>
   </div>
 
   <main class="max-w-md mx-auto p-4 space-y-4">
-    <!-- Current Location Breadcrumb & Progress -->
     <div class="flex items-center justify-between px-1">
       <div class="flex items-center gap-1.5 text-xs font-medium text-slate-500">
         <i class="fa-solid fa-location-dot text-emerald-600"></i>
@@ -137,12 +127,9 @@
       </div>
     </div>
 
-    <!-- Class Cards Container -->
     <div id="class-cards-container" class="space-y-3.5">
-      <!-- Dynamically generated class cards go here -->
     </div>
 
-    <!-- Quick Navigation to Next Floor -->
     <div class="pt-4 flex items-center justify-between gap-3">
       <button id="btn-prev-floor" onclick="navigateFloor(-1)" class="flex-1 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm active:bg-slate-50 transition">
         <i class="fa-solid fa-chevron-left text-slate-400"></i> 上一樓層
@@ -152,7 +139,6 @@
       </button>
     </div>
 
-    <!-- 頁尾管理員低調入口 (老師巡堂不會誤觸) -->
     <div class="pt-6 pb-2 text-center">
       <button onclick="promptAdminPassword()" class="text-[11px] text-slate-300 hover:text-slate-500 transition flex items-center justify-center gap-1 mx-auto py-1 px-3 rounded-full hover:bg-slate-200/50">
         <i class="fa-solid fa-lock text-[9px]"></i>
@@ -161,7 +147,6 @@
     </div>
   </main>
 
-  <!-- ==================== 管理員 PIN 碼驗證視窗 (Admin Password Modal) ==================== -->
   <div id="admin-auth-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity">
     <div class="bg-white w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center animate-in">
       <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center mx-auto text-xl">
@@ -206,7 +191,6 @@
 
   <div id="summary-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
     <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in">
-      <!-- Modal Header -->
       <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div>
           <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
@@ -220,14 +204,10 @@
         </button>
       </div>
 
-      <!-- Modal Body (Issues Filter) -->
       <div class="p-4 overflow-y-auto flex-1 space-y-3" id="summary-content-list">
-        <!-- Populated by JS -->
       </div>
 
-      <!-- Modal Footer -->
       <div class="p-3 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
-        <!-- Google 試算表一鍵即時同步按鈕 -->
         <button onclick="syncToGoogleSheets()" id="btn-sync-gsheet" class="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm active:scale-95 transition">
           <i class="fa-solid fa-cloud-arrow-up"></i>
           <span>一鍵寫入 Google 試算表（整合同仁巡查成一橫列）</span>
@@ -248,11 +228,9 @@
     </div>
   </div>
 
-  <!-- ==================== 自訂管理視窗 (樓層/班級 + Google 試算表) ==================== -->
   <div id="settings-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
     <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in">
       
-      <!-- 視窗標題列 -->
       <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div class="flex items-center gap-2">
           <span class="w-7 h-7 rounded-lg bg-slate-800 text-white flex items-center justify-center text-sm shadow-xs">
@@ -268,7 +246,6 @@
         </button>
       </div>
 
-      <!-- 設定分頁切換 Tabs -->
       <div class="flex border-b border-slate-200 bg-white px-3 pt-2 gap-2 text-xs font-bold">
         <button id="tab-btn-classes" onclick="switchSettingsTab('classes')" class="pb-2 px-2 border-b-2 border-emerald-600 text-emerald-700 flex items-center gap-1.5">
           <i class="fa-solid fa-school"></i> 校舍與班級設定
@@ -281,10 +258,8 @@
         </button>
       </div>
 
-      <!-- 視窗內容區塊 -->
       <div class="p-4 overflow-y-auto flex-1 space-y-4 text-xs" id="settings-body">
         
-        <!-- 分頁 1: 樓層與班級名稱修改區 -->
         <div id="settings-tab-classes" class="space-y-4">
           <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-emerald-950 leading-relaxed">
             <div class="font-bold flex items-center gap-1 text-xs text-emerald-800">
@@ -295,27 +270,21 @@
             </p>
           </div>
 
-          <!-- 動態產生的各棟編輯容器 -->
           <div id="buildings-editor-container" class="space-y-4">
-            <!-- 由 JavaScript 產生 -->
           </div>
 
-          <!-- 新增一棟建築按鈕 -->
           <button onclick="addNewBuilding()" class="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 font-bold rounded-xl transition flex items-center justify-center gap-1 text-xs">
             <i class="fa-solid fa-plus"></i> 新增一棟大樓
           </button>
         </div>
 
-        <!-- 分頁 2: 處室名單管理區 -->
         <div id="settings-tab-depts" class="hidden space-y-3">
           <div class="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 text-emerald-950 text-[11px]">
             <span class="font-bold">處室與組別職位維護：</span>
             可在下方新增各處室，並用頓號或逗號自訂該處室對應之組別與職稱（如：教學組、生輔組等）。
           </div>
 
-          <!-- 各處室與組別編輯容器 -->
           <div id="dept-roles-editor-container" class="space-y-3">
-            <!-- Populated by JS -->
           </div>
 
           <button onclick="addNewDepartment()" class="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 font-bold rounded-xl transition flex items-center justify-center gap-1 text-xs">
@@ -323,7 +292,6 @@
           </button>
         </div>
 
-        <!-- 分頁 3: Google 試算表串接 -->
         <div id="settings-tab-gsheet" class="hidden space-y-3">
           <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
             <label class="block font-bold text-slate-800 text-xs">
@@ -333,14 +301,13 @@
               placeholder="https://script.google.com/macros/s/AKfycb.../exec"
               class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono">
             <div class="flex items-center justify-between pt-1">
-              <span class="text-[11px] text-slate-400">填妥後即可直接同步每次巡堂紀錄</span>
+              <span class="text-[11px] text-slate-400">系統已預設寫入試算表串接網址</span>
               <button onclick="testGoogleSheetConnection()" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded text-[11px] active:scale-95">
                 連線測試
               </button>
             </div>
           </div>
 
-          <!-- Apps Script 複製代碼教學 -->
           <div class="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-700 flex items-center gap-1.5">
@@ -353,7 +320,7 @@
             <ol class="list-decimal list-inside space-y-1 text-slate-600 text-[11px] leading-normal">
               <li>開啟您的 Google 試算表，點選上方工具列<strong>「擴充功能」➔「Apps Script」</strong>。</li>
               <li>清空編輯器，貼上下方的<strong>指令碼</strong>。</li>
-              <li>點選右上角<strong>「部署」➔「新增部署作業」</strong>，類型選「網頁應用程式」，<strong>「誰可以存取」請務必選「所有人」</strong>，部署後複製產生的網址貼至上方輸入框即可！</li>
+              <li>點選右上角<strong>「部署」➔「新增部署作業」</strong>，類型選「網頁應用程式」，<strong>「誰可以存取」請務必選「所有人」</strong>，部署完成即可！</li>
             </ol>
             
             <textarea id="apps-script-code-box" readonly class="w-full h-28 bg-slate-900 text-emerald-300 font-mono text-[10px] p-2 rounded-lg leading-tight select-all focus:outline-none">function doPost(e) {
@@ -363,11 +330,9 @@
     if (payload.action === "test") {
       return ContentService.createTextOutput(JSON.stringify({status: "ok", msg: "連線成功！"})).setMimeType(ContentService.MimeType.JSON);
     }
-    // 檢查若第一列無標題則自動補上
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(["巡查日期", "紀錄時間", "節次", "巡堂同仁", "整體概況", "需留意/異常班級摘要", "特殊教學活動班級摘要", "查核進度", "電子簽核狀態"]);
     }
-    // 同時相容單列 (row) 與多列 (rows) 格式寫入
     if (payload.row && Array.isArray(payload.row)) {
       sheet.appendRow(payload.row);
     } else if (payload.rows && payload.rows.length > 0) {
@@ -382,7 +347,6 @@
 }</textarea>
           </div>
 
-          <!-- 安全密碼修改設定 -->
           <div class="border border-slate-200 rounded-xl p-3 bg-white space-y-2 mt-2">
             <span class="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
               <i class="fa-solid fa-key text-emerald-600"></i> 管理員密碼修改
@@ -400,7 +364,6 @@
 
       </div>
 
-      <!-- 設定視窗底端操作列 -->
       <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
         <button onclick="restoreDefaultConfig()" class="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-slate-200 hover:bg-slate-300 rounded-xl transition">
           還原範例預設
@@ -413,7 +376,6 @@
     </div>
   </div>
 
-  <!-- 多人巡查同仁複選視窗 -->
   <div id="multi-role-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
     <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in">
       <div class="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -429,7 +391,6 @@
         </button>
       </div>
       <div id="multi-role-picker-container" class="p-3 overflow-y-auto flex-1 space-y-2.5">
-        <!-- Populated by JS -->
       </div>
       <div class="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
         <button onclick="clearSelectedInspectors()" class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-200 rounded-lg font-semibold transition">
@@ -442,10 +403,8 @@
     </div>
   </div>
 
-  <!-- 確認送出與電子簽名視窗 (Confirmation & Signature Modal) -->
   <div id="confirm-submit-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center transition-opacity">
     <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in">
-      <!-- 視窗標題 -->
       <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div class="flex items-center gap-2">
           <span class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
@@ -461,9 +420,7 @@
         </button>
       </div>
 
-      <!-- 視窗內容：巡查摘要與簽名畫布 -->
       <div class="p-4 overflow-y-auto flex-1 space-y-3.5 text-xs">
-        <!-- 巡查基本資料確認卡片 -->
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
           <div class="flex items-center justify-between text-slate-700 pb-1.5 border-b border-slate-200">
             <span class="text-slate-500 font-medium">巡查時段：</span>
@@ -479,7 +436,6 @@
           </div>
         </div>
 
-        <!-- 電子簽名區塊 -->
         <div class="space-y-1.5">
           <div class="flex items-center justify-between">
             <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
@@ -491,7 +447,6 @@
             </button>
           </div>
           
-          <!-- 手寫簽名畫布 -->
           <div class="relative w-full h-36 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden touch-none select-none">
             <canvas id="signature-canvas" class="w-full h-full cursor-crosshair"></canvas>
             <div id="signature-hint" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400 gap-1">
@@ -503,7 +458,6 @@
         </div>
       </div>
 
-      <!-- 視窗底端操作列 -->
       <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2.5">
         <button type="button" onclick="toggleConfirmModal(false)" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition active:scale-95">
           返回修改
@@ -516,7 +470,6 @@
     </div>
   </div>
 
-  <!-- Toast Notification -->
   <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-medium flex items-center gap-2 opacity-0 pointer-events-none transition-all duration-300">
     <i class="fa-solid fa-circle-check text-emerald-400" id="toast-icon"></i>
     <span id="toast-message">操作已完成</span>
@@ -527,7 +480,6 @@
        1. DATA STRUCTURE & INITIALIZATION
        ========================================================================== */
 
-    // 處室與組別職位名單配置 (可由後端新增/修改/刪除)
     let departmentRolesConfig = [
       {
         department: '教務處',
@@ -559,12 +511,10 @@
       }
     ];
 
-    // 目前選中的巡查人員清單 (支援多人)
     let selectedInspectors = [
       { dept: '教務處', role: '教學組' }
     ];
 
-    // Common Quick Tag Definitions
     const STATUS_TAGS = [
       { id: 'tag_teach_normal', label: '教學狀況正常', type: 'normal', color: 'emerald', icon: 'fa-circle-check' },
       { id: 'tag_group_teach', label: '分組教學', type: 'pedagogy', color: 'teal', icon: 'fa-people-group' },
@@ -580,7 +530,6 @@
       { id: 'tag_absent', label: '缺曠偏多', type: 'warning', color: 'orange', icon: 'fa-user-minus' }
     ];
 
-    // Common Remark Snippets for quick one-tap insertion
     const QUICK_REMARKS = [
       '教師調課至電腦教室',
       '投影機無訊號待修',
@@ -589,7 +538,6 @@
       '冷氣異常滴水'
     ];
 
-    // Configurable structure that users can customize freely:
     let schoolConfig = [
       {
         id: '忠孝',
@@ -624,26 +572,21 @@
       }
     ];
 
-    // Google Apps Script Webhook URL setting
-    // 【重要提示】：請將下方單引號裡面的網址換成您的 Google Apps Script 部署網址！
-    let googleSheetWebhookUrl = 'https://docs.google.com/spreadsheets/d/1h38P7HfKPJth_51wT1N_LvEUc849O1FVk-E-dV4GWu8/edit?gid=0#gid=0';
+    // 已為您帶入您的專屬 Google Apps Script 部署網址：
+    let googleSheetWebhookUrl = 'https://script.google.com/macros/s/AKfycbxeohCCQoW38XXfRxotADT4se0qJ47xWiLw77JNfm9BmuMt50gkX9J42VP1nW8KZX03Rg/exec';
 
-    // 管理員後台安全 PIN 碼（預設 8888）
     let adminPinCode = '8888';
 
-    // Inspection state structure keyed by: buildingId_floor_classId
     let inspectionData = {};
     let currentBuildingId = '忠孝';
     let currentFloor = '1F';
 
-    // 電子簽名相關狀態
     let signatureCanvas = null;
     let signatureCtx = null;
     let isDrawingSignature = false;
     let hasDrawnSignature = false;
     let signatureDataUrl = null;
 
-    /* Generate standard classes based on schoolConfig */
     function initializeData() {
       const oldData = inspectionData;
       inspectionData = {};
@@ -679,7 +622,6 @@
       }
     }
 
-    /* 渲染處室與組別下拉選單 */
     function renderDepartmentsDropdown() {
       const deptSelect = document.getElementById('department-select');
       const roleSelect = document.getElementById('role-select');
@@ -738,7 +680,6 @@
       renderSelectedInspectorsPills();
     }
 
-    /* 渲染已選取人員標籤 */
     function renderSelectedInspectorsPills() {
       const container = document.getElementById('selected-inspectors-pills');
       if (!container) return;
@@ -778,7 +719,6 @@
       renderMultiRolePicker();
     }
 
-    /* 多人複選彈窗開關與渲染 */
     function toggleMultiRoleModal(show) {
       const modal = document.getElementById('multi-role-modal');
       if (show) {
@@ -964,7 +904,6 @@
       }
     }
 
-    /* ==================== CLASS CARDS RENDERING & INTERACTIONS ==================== */
     function renderClassCards() {
       const container = document.getElementById('class-cards-container');
       if (!container) return;
@@ -1529,7 +1468,7 @@
 
     function saveAndApplySettings() {
       const gasInput = document.getElementById('setting-gas-url');
-      if (gasInput) {
+      if (gasInput && gasInput.value.trim()) {
         googleSheetWebhookUrl = gasInput.value.trim();
       }
 
@@ -1581,10 +1520,6 @@
 
     async function testGoogleSheetConnection() {
       const url = document.getElementById('setting-gas-url').value.trim() || googleSheetWebhookUrl;
-      if (!url || url === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') {
-        showToast("請先填寫正確的 Apps Script 網頁應用程式網址");
-        return;
-      }
 
       showToast("正在測試連線中...", "fa-spinner fa-spin");
       try {
@@ -1606,13 +1541,6 @@
 
     async function syncToGoogleSheets() {
       const url = googleSheetWebhookUrl || (document.getElementById('setting-gas-url') ? document.getElementById('setting-gas-url').value.trim() : '');
-      if (!url || url === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') {
-        toggleSummaryModal(false);
-        toggleSettingsModal(true);
-        switchSettingsTab('gsheet');
-        showToast("尚未設定 Google 試算表網址，請先完成設定");
-        return;
-      }
 
       const btn = document.getElementById('btn-sync-gsheet');
       const originalText = btn.innerHTML;
