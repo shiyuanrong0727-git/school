@@ -1,0 +1,70 @@
+function testAuthorize() {
+  // 首次請選取此函式並按「執行」，以完成權限授權
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  Logger.log("試算表連線：" + sheet.getName());
+  var folder = DriveApp.getRootFolder();
+  Logger.log("雲端硬碟連線：" + folder.getName());
+}
+
+function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var payload = JSON.parse(e.postData.contents);
+    if (payload.action === "test") {
+      return ContentService.createTextOutput(JSON.stringify({status: "ok", msg: "連線成功！"})).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 初始化表頭
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["巡查日期", "紀錄時間", "節次", "巡堂同仁", "整體概況", "需留意/異常班級摘要", "特殊教學活動班級摘要", "查核進度", "巡堂紀錄 PDF 連結", "電子簽核狀態"]);
+    }
+    
+    var pdfUrl = "未產生 PDF";
+    var signStatus = (payload.signatureBase64 && payload.signatureBase64.length > 50) ? "已完成電子簽署" : "未簽名";
+    
+    // 獨立生成 PDF，即便雲端硬碟權限受限也不影響試算表寫入
+    if (payload.signatureBase64 && payload.signatureBase64.indexOf("base64,") !== -1) {
+      try {
+        var folderName = "巡堂紀錄PDF歸檔";
+        var folders = DriveApp.getFoldersByName(folderName);
+        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        var cleanDate = (payload.date || "").replace(/\//g, "-");
+        var htmlContent = '<html><body style="font-family:sans-serif;padding:20px;">'
+          + '<h2 style="color:#065f46;border-bottom:2px solid #059669;padding-bottom:8px;">校園巡堂快速紀錄表</h2>'
+          + '<p><b>日期時間：</b>' + (payload.date || "") + ' ' + (payload.time || "") + '</p>'
+          + '<p><b>巡查時段：</b>' + (payload.period || "") + '</p>'
+          + '<p><b>巡堂同仁：</b>' + (payload.inspector || "") + '</p>'
+          + '<p><b>需留意班級：</b>' + (payload.issueSummary || "正常") + '</p>'
+          + '<p><b>特殊教學：</b>' + (payload.pedagogySummary || "常態教學") + '</p>'
+          + '<p><b>簽名：</b><br><img style="max-height:60px;" src="' + payload.signatureBase64 + '" /></p>'
+          + '</body></html>';
+        
+        var pdfBlob = Utilities.newBlob(htmlContent, "text/html").getAs("application/pdf");
+        pdfBlob.setName("巡堂紀錄_" + cleanDate + "_" + (payload.period || "") + ".pdf");
+        var pdfFile = folder.createFile(pdfBlob);
+        try { pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(eShare) {}
+        pdfUrl = pdfFile.getUrl();
+      } catch(pdfErr) {
+        pdfUrl = "略過PDF(" + pdfErr.message + ")";
+      }
+    }
+    
+    // 寫入一整橫列（100% 絕對優先寫入）
+    var singleRow = [
+      payload.date,
+      payload.time,
+      payload.period,
+      payload.inspector,
+      payload.overallStatus,
+      payload.issueSummary,
+      payload.pedagogySummary,
+      payload.progress,
+      pdfUrl,
+      signStatus
+    ];
+    sheet.appendRow(singleRow);
+    return ContentService.createTextOutput(JSON.stringify({status: "success", pdfUrl: pdfUrl})).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({status: "error", message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
