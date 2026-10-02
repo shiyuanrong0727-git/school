@@ -523,112 +523,6 @@
   </div>
 
   <script>
-    /* ====================================================================================================
-       【★ 管理人員請注意：請在此處填入 GOOGLE APPS SCRIPT 網址 ★】
-       ====================================================================================================
-       請將下方 DEFAULT_GOOGLE_SHEET_URL 引號內的網址換成您 Google Apps Script 部署後的 Web App URL。
-       送出時系統會直接讀取此網址，後台介面已全面移除此設定，老師巡堂亦無法竄改。
-
-       範例：
-       const DEFAULT_GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxxxxxxx.../exec';
-       ==================================================================================================== */
-    const DEFAULT_GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxaNGaYc5Oqx9lEl9irV6mndXOUPqdgpNsx_h6kwTBcD7eRX87_z963ETCVmat3q2Sc/exec'; 
-    /* ==================================================================================================== */
-
-    /* ==========================================================================
-       ★【自動生成 PDF 並存檔至 Google 雲端硬碟的 Apps Script 完整程式碼】★
-       --------------------------------------------------------------------------
-       請將此段程式碼複製並貼到您的 Google 試算表（擴充功能 ➔ Apps Script）：
-       
-       function testAuthorize() {
-         // 首次使用請點此函式按「執行」，以完成試算表與雲端硬碟之存取授權
-         var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-         Logger.log("試算表連線正常：" + sheet.getName());
-         var folder = DriveApp.getRootFolder();
-         Logger.log("雲端硬碟授權正常：" + folder.getName());
-       }
-
-       function doPost(e) {
-         try {
-           var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-           var payload = JSON.parse(e.postData.contents);
-           if (payload.action === "test") {
-             return ContentService.createTextOutput(JSON.stringify({status: "ok", msg: "連線成功！"})).setMimeType(ContentService.MimeType.JSON);
-           }
-           
-           // 1. 初始化表頭（若第一列為空）
-           if (sheet.getLastRow() === 0) {
-             sheet.appendRow(["巡查日期", "紀錄時間", "節次", "巡堂同仁", "整體概況", "需留意/異常班級摘要", "特殊教學活動班級摘要", "查核進度", "巡堂紀錄 PDF 連結", "電子簽核狀態"]);
-           }
-           
-           var pdfUrl = "未產生 PDF";
-           var signStatus = (payload.signatureBase64 && payload.signatureBase64.length > 50) ? "已完成電子簽署" : "未簽名";
-           
-           // 2. 嘗試建立 PDF 歸檔（使用獨立 try...catch 隔離，避免 Drive 權限不足導致整列沒寫入）
-           if (payload.signatureBase64 && payload.signatureBase64.indexOf("base64,") !== -1) {
-             try {
-               var folderName = "巡堂紀錄PDF歸檔";
-               var folders = DriveApp.getFoldersByName(folderName);
-               var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-               var cleanDate = (payload.date || "").replace(/\//g, "-");
-               var htmlContent = `
-                 <html><head><meta charset="utf-8"><style>
-                   body { font-family: sans-serif; padding: 25px; color: #1e293b; }
-                   .header { text-align: center; border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 20px; }
-                   .title { font-size: 20px; font-weight: bold; color: #065f46; margin: 0; }
-                   table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-                   th, td { border: 1px solid #cbd5e1; padding: 10px 12px; font-size: 13px; text-align: left; }
-                   th { background-color: #f8fafc; color: #334155; width: 25%; }
-                   .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #ecfdf5; color: #065f46; }
-                   .sign-img { max-height: 60px; }
-                 </style></head><body>
-                   <div class="header"><h1 class="title">校園巡堂快速紀錄表</h1></div>
-                   <table>
-                     <tr><th>巡查日期 / 時間</th><td>` + (payload.date || "") + ` ` + (payload.time || "") + `</td></tr>
-                     <tr><th>巡查時段 (節次)</th><td>` + (payload.period || "") + `</td></tr>
-                     <tr><th>巡堂同仁</th><td><b>` + (payload.inspector || "") + `</b></td></tr>
-                     <tr><th>查核進度</th><td>` + (payload.progress || "") + `</td></tr>
-                     <tr><th>整體概況</th><td><span class="badge">` + (payload.overallStatus || "良好") + `</span></td></tr>
-                     <tr><th>需留意班級摘要</th><td>` + (payload.issueSummary || "全校教學與秩序正常，無特別異常") + `</td></tr>
-                     <tr><th>特殊教學活動摘要</th><td>` + (payload.pedagogySummary || "常態教學") + `</td></tr>
-                     <tr><th>電子簽名</th><td><img class="sign-img" src="` + payload.signatureBase64 + `" /></td></tr>
-                   </table>
-                 </body></html>
-               `;
-               var pdfBlob = Utilities.newBlob(htmlContent, "text/html").getAs("application/pdf");
-               var pdfFileName = "巡堂紀錄_" + cleanDate + "_" + (payload.period || "") + "_" + (payload.inspector || "") + ".pdf";
-               pdfBlob.setName(pdfFileName);
-               var pdfFile = folder.createFile(pdfBlob);
-               try {
-                 pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-               } catch(eShare) {}
-               pdfUrl = pdfFile.getUrl();
-             } catch(pdfErr) {
-               pdfUrl = "PDF產生略過(" + pdfErr.message + ")";
-             }
-           }
-           
-           // 3. 寫入一整橫列（100% 保證必定執行寫入試算表）
-           var singleRow = [
-             payload.date,
-             payload.time,
-             payload.period,
-             payload.inspector,
-             payload.overallStatus,
-             payload.issueSummary,
-             payload.pedagogySummary,
-             payload.progress,
-             pdfUrl,
-             signStatus
-           ];
-           sheet.appendRow(singleRow);
-           return ContentService.createTextOutput(JSON.stringify({status: "success", pdfUrl: pdfUrl})).setMimeType(ContentService.MimeType.JSON);
-         } catch(err) {
-           return ContentService.createTextOutput(JSON.stringify({status: "error", message: err.toString()})).setMimeType(ContentService.MimeType.JSON);
-         }
-       }
-       ========================================================================== */
-
     /* ==========================================================================
        1. DATA STRUCTURE & INITIALIZATION
        ========================================================================== */
@@ -730,8 +624,10 @@
       }
     ];
 
-    // Google Apps Script Webhook URL setting（預設採用最上方 DEFAULT_GOOGLE_SHEET_URL）
-    let googleSheetWebhookUrl = DEFAULT_GOOGLE_SHEET_URL;
+    // Google Apps Script Webhook URL setting
+    // 【重要提示】：請將下方引號內的網址直接換成您的 Google Apps Script 部署網址
+    // 這樣放進協作平台後，無論何時重新整理都不會丟失網址！
+    let googleSheetWebhookUrl = '';
 
     // 管理員後台安全 PIN 碼（預設 8888）
     let adminPinCode = '8888';
@@ -1391,6 +1287,7 @@
         modal.classList.remove('hidden');
         renderBuildingsEditor();
         renderDeptRolesEditor();
+        document.getElementById('setting-gas-url').value = googleSheetWebhookUrl;
       } else {
         modal.classList.add('hidden');
       }
@@ -1399,27 +1296,32 @@
     function switchSettingsTab(tab) {
       const tabClasses = document.getElementById('settings-tab-classes');
       const tabDepts = document.getElementById('settings-tab-depts');
+      const tabGsheet = document.getElementById('settings-tab-gsheet');
       const btnClasses = document.getElementById('tab-btn-classes');
       const btnDepts = document.getElementById('tab-btn-depts');
-
-      if (!tabClasses || !tabDepts) return;
+      const btnGsheet = document.getElementById('tab-btn-gsheet');
 
       // Hide all
       tabClasses.classList.add('hidden');
       tabDepts.classList.add('hidden');
+      tabGsheet.classList.add('hidden');
 
       const activeClass = 'pb-2 px-2 border-b-2 border-emerald-600 text-emerald-700 flex items-center gap-1.5';
       const inactiveClass = 'pb-2 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-1.5';
 
       btnClasses.className = inactiveClass;
       btnDepts.className = inactiveClass;
+      btnGsheet.className = inactiveClass;
 
       if (tab === 'classes') {
         tabClasses.classList.remove('hidden');
         btnClasses.className = activeClass;
-      } else {
+      } else if (tab === 'depts') {
         tabDepts.classList.remove('hidden');
         btnDepts.className = activeClass;
+      } else {
+        tabGsheet.classList.remove('hidden');
+        btnGsheet.className = activeClass;
       }
     }
 
@@ -1657,6 +1559,12 @@
     }
 
     function saveAndApplySettings() {
+      // Save GAS Webhook URL
+      const gasInput = document.getElementById('setting-gas-url');
+      if (gasInput) {
+        googleSheetWebhookUrl = gasInput.value.trim();
+      }
+
       // 檢查目前選中人員是否仍在處室清單中，若無則重設為第一個處室與組別
       const validSelected = selectedInspectors.filter(item => {
         const foundDept = departmentRolesConfig.find(d => d.department === item.dept);
@@ -1684,16 +1592,60 @@
       renderNavigation();
       renderClassCards();
       toggleSettingsModal(false);
-      showToast("後台設定（校舍/班級/處室組別）已更新套用！");
+      showToast("後台設定（校舍/班級/處室組別/Sheet）已更新套用！");
     }
 
     /* ==================== GOOGLE SHEETS SYNC LOGIC ==================== */
-    async function syncToGoogleSheets() {
-      // 直接使用程式碼開頭定義的 DEFAULT_GOOGLE_SHEET_URL
-      const url = (typeof DEFAULT_GOOGLE_SHEET_URL !== 'undefined' ? DEFAULT_GOOGLE_SHEET_URL : '').trim();
+    function copyAppsScriptCode() {
+      const code = document.getElementById('apps-script-code-box').value;
+      const ta = document.createElement("textarea");
+      ta.value = code;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast("Apps Script 程式碼已複製！請至 Google 試算表貼上");
+      } catch (e) {
+        showToast("複製失敗，請手動全選複製");
+      }
+      document.body.removeChild(ta);
+    }
 
-      if (!url || url.length < 10) {
-        showToast("⚠️ 請先在程式碼第 450 行填妥 DEFAULT_GOOGLE_SHEET_URL 網址", "fa-triangle-exclamation");
+    async function testGoogleSheetConnection() {
+      const url = document.getElementById('setting-gas-url').value.trim();
+      if (!url) {
+        showToast("請先輸入 Apps Script 網頁應用程式網址");
+        return;
+      }
+
+      showToast("正在測試連線中...", "fa-spinner fa-spin");
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: "test" })
+        });
+        const result = await res.json();
+        if (result.status === "ok") {
+          showToast("連線成功！Google 試算表串接正常！");
+        } else {
+          showToast("已收到回傳但格式異常，請確認部署權限");
+        }
+      } catch (err) {
+        // Due to CORS redirect in Google Apps Script, text/plain POST still succeeds on Google side
+        showToast("已發送請求！請確認試算表內部署權限為「所有人」");
+      }
+    }
+
+    async function syncToGoogleSheets() {
+      const url = googleSheetWebhookUrl || (document.getElementById('setting-gas-url') ? document.getElementById('setting-gas-url').value.trim() : '');
+      if (!url) {
+        toggleSummaryModal(false);
+        toggleSettingsModal(true);
+        switchSettingsTab('gsheet');
+        showToast("尚未填寫 Google 試算表網址，請先完成設定");
         return;
       }
 
@@ -1765,10 +1717,10 @@
 
       // 組合出「單一一整橫列」資料
       const singleInspectionRow = [
-        dateStr,                 // 1. 巡查日期
-        timeStr,                 // 2. 巡查時間
-        period,                  // 3. 節次
-        inspector,               // 4. 巡堂同仁
+        dateStr,                 // 1. 巡查日期 (例如 2026/09/09)
+        timeStr,                 // 2. 巡查時間 (例如 23:27)
+        period,                  // 3. 節次 (例如 第 3 節)
+        inspector,               // 4. 巡堂同仁 (例如 教務處-教學組)
         overallStatus,           // 5. 整體概況
         issueSummaryText,        // 6. 需留意/異常班級摘要 (已全部濃縮)
         pedagogySummaryText,     // 7. 特殊教學活動班級摘要
@@ -1777,33 +1729,20 @@
       ];
 
       try {
-        // 打包包含電子簽名圖檔 (Base64) 之完整資料物件
-        const syncPayload = {
-          action: "append",
-          date: dateStr,
-          time: timeStr,
-          period: period,
-          inspector: inspector,
-          overallStatus: overallStatus,
-          issueSummary: issueSummaryText,
-          pedagogySummary: pedagogySummaryText,
-          progress: progressText,
-          signatureBase64: signatureDataUrl || "",
-          row: singleInspectionRow
-        };
-
-        // 使用 mode: 'no-cors' 配合 text/plain，可穿透 Google Sites 沙盒 iframe 的 CORS 限制
+        // 同時提供 row 與 rows，確保任何版本的 Apps Script 都能正確接手寫入
         await fetch(url, {
           method: 'POST',
-          mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(syncPayload)
+          body: JSON.stringify({
+            action: "append",
+            row: singleInspectionRow,
+            rows: [singleInspectionRow]
+          })
         });
 
-        showToast("✅ 已成功寫入 Google 試算表並產出 PDF 簽章歸檔！");
+        showToast("✅ 已成功濃縮為單一橫列並寫入 Google 試算表！");
       } catch (e) {
-        // 若瀏覽器回報 opaque network 仍能順利送達 Google Apps Script
-        showToast("✅ 紀錄已成功傳送至 Google 試算表！");
+        showToast("同步訊號已送出（若試算表未更新請檢查權限設定）");
       } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
@@ -2115,10 +2054,7 @@
       // 關閉確認視窗並開啟成果總結清單
       toggleConfirmModal(false);
       toggleSummaryModal(true);
-      showToast("✅ 簽名完成，正在同步寫入 Google 試算表...", "fa-cloud-arrow-up");
-
-      // 自動背景同步寫入 Google 試算表（無須同仁再次點擊）
-      syncToGoogleSheets();
+      showToast("✅ 巡堂紀錄與電子簽署已完成確認！", "fa-circle-check");
     }
 
     function showToast(msg, icon = 'fa-circle-check') {
